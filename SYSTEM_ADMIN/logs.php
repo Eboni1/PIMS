@@ -14,6 +14,73 @@ if ($_SESSION['role'] !== 'system_admin' && $_SESSION['role'] !== 'admin') {
 
 require_once '../config.php';
 
+// Handle clear logs action
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['clear_logs'])) {
+    $range = $_POST['range'] ?? 'all';
+    $clear_message = '';
+    
+    try {
+        // Build WHERE clause based on range
+        $where_conditions = [];
+        $params = [];
+        $types = '';
+        
+        switch ($range) {
+            case 'all':
+                try {
+                    // Use DELETE instead of TRUNCATE for clearing all logs
+                    $conn->query("DELETE FROM system_logs");
+                    $clear_message = "Successfully cleared all system logs.";
+                } catch (Exception $delete_error) {
+                    $clear_message = "Failed to clear logs";
+                }
+                break;
+            case 'older_than_30':
+                $where_conditions[] = "created_at < DATE_SUB(NOW(), INTERVAL 30 DAY)";
+                break;
+            case 'older_than_90':
+                $where_conditions[] = "created_at < DATE_SUB(NOW(), INTERVAL 90 DAY)";
+                break;
+            case 'older_than_365':
+                $where_conditions[] = "created_at < DATE_SUB(NOW(), INTERVAL 365 DAY)";
+                break;
+            default:
+                $clear_message = 'Invalid clear range';
+        }
+        
+        // For partial deletions, use direct DELETE
+        if (!empty($where_conditions)) {
+            try {
+                $delete_sql = "DELETE FROM system_logs WHERE " . implode(' AND ', $where_conditions);
+                
+                $stmt = $conn->prepare($delete_sql);
+                if (!empty($params)) {
+                    $stmt->bind_param($types, ...$params);
+                }
+                
+                if ($stmt->execute()) {
+                    $actual_deleted = $stmt->affected_rows;
+                    $stmt->close();
+                    $clear_message = "Successfully deleted {$actual_deleted} log entries.";
+                } else {
+                    $clear_message = 'Failed to clear logs';
+                }
+            } catch (Exception $partial_error) {
+                $clear_message = 'Partial deletion failed';
+            }
+        }
+        
+        // Redirect back with message
+        header('Location: logs.php?message=' . urlencode($clear_message));
+        exit();
+        
+    } catch (Exception $e) {
+        error_log("Clear logs error: " . $e->getMessage());
+        header('Location: logs.php?message=' . urlencode('Database error occurred'));
+        exit();
+    }
+}
+
 // Function to log system actions
 function logSystemAction($user_id, $action, $module, $details = null) {
     global $conn;
@@ -248,6 +315,15 @@ $page_title = 'System Logs';
                 </div>
             </div>
             
+            <!-- Message Display -->
+            <?php if (isset($_GET['message'])): ?>
+                <div class="alert alert-info alert-dismissible fade show" role="alert">
+                    <i class="bi bi-info-circle"></i>
+                    <?php echo htmlspecialchars($_GET['message']); ?>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            <?php endif; ?>
+            
             <!-- Logs Display -->
             <div class="row">
                 <div class="col-12">
@@ -433,42 +509,44 @@ $page_title = 'System Logs';
     <div class="modal fade" id="clearLogsModal" tabindex="-1" aria-labelledby="clearLogsModalLabel" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
-                <div class="modal-header bg-danger text-white">
-                    <h5 class="modal-title" id="clearLogsModalLabel">
-                        <i class="bi bi-exclamation-triangle"></i> Clear System Logs
-                    </h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="alert alert-warning" role="alert">
-                        <i class="bi bi-exclamation-triangle"></i>
-                        <strong>Warning:</strong> This action cannot be undone!
+                <form method="POST" action="logs.php">
+                    <div class="modal-header bg-danger text-white">
+                        <h5 class="modal-title" id="clearLogsModalLabel">
+                            <i class="bi bi-exclamation-triangle"></i> Clear System Logs
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
-                    <p>Are you sure you want to clear the system logs? This will permanently delete all log entries.</p>
-                    <div class="mb-3">
-                        <label for="clearLogsRange" class="form-label">Clear Range</label>
-                        <select class="form-select" id="clearLogsRange">
-                            <option value="all">All Logs</option>
-                            <option value="older_than_30">Older than 30 days</option>
-                            <option value="older_than_90">Older than 90 days</option>
-                            <option value="older_than_365">Older than 1 year</option>
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="confirmClear">
-                            <label class="form-check-label" for="confirmClear">
-                                I understand that this action cannot be undone
-                            </label>
+                    <div class="modal-body">
+                        <div class="alert alert-warning" role="alert">
+                            <i class="bi bi-exclamation-triangle"></i>
+                            <strong>Warning:</strong> This action cannot be undone!
+                        </div>
+                        <p>Are you sure you want to clear the system logs? This will permanently delete all log entries.</p>
+                        <div class="mb-3">
+                            <label for="clearLogsRange" class="form-label">Clear Range</label>
+                            <select class="form-select" id="clearLogsRange" name="range">
+                                <option value="all">All Logs</option>
+                                <option value="older_than_30">Older than 30 days</option>
+                                <option value="older_than_90">Older than 90 days</option>
+                                <option value="older_than_365">Older than 1 year</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="confirmClear" onchange="toggleClearButton()">
+                                <label class="form-check-label" for="confirmClear">
+                                    I understand that this action cannot be undone
+                                </label>
+                            </div>
                         </div>
                     </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-danger" onclick="performClearLogs()" id="confirmClearBtn" disabled>
-                        <i class="bi bi-trash"></i> Clear Logs
-                    </button>
-                </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" name="clear_logs" value="1" class="btn btn-danger" id="confirmClearBtn" disabled>
+                            <i class="bi bi-trash"></i> Clear Logs
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
@@ -676,43 +754,9 @@ $page_title = 'System Logs';
             $('#clearLogsModal').modal('show');
         }
         
-        function performClearLogs() {
-            const range = $('#clearLogsRange').val();
-            
-            if (!$('#confirmClear').is(':checked')) {
-                alert('Please confirm that you understand this action cannot be undone.');
-                return;
-            }
-            
-            // Show loading state
-            const clearBtn = document.getElementById('confirmClearBtn');
-            const originalText = clearBtn.innerHTML;
-            clearBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Clearing...';
-            clearBtn.disabled = true;
-            
-            // Send AJAX request to clear logs
-            $.ajax({
-                url: 'ajax/clear_logs.php',
-                method: 'POST',
-                data: { range: range },
-                success: function(response) {
-                    const result = JSON.parse(response);
-                    if (result.success) {
-                        alert('Logs cleared successfully! ' + result.message);
-                        location.reload(); // Reload to show updated logs
-                    } else {
-                        alert('Error clearing logs: ' + result.message);
-                    }
-                },
-                error: function() {
-                    alert('Error clearing logs. Please try again.');
-                },
-                complete: function() {
-                    clearBtn.innerHTML = originalText;
-                    clearBtn.disabled = false;
-                    $('#clearLogsModal').modal('hide');
-                }
-            });
+        function toggleClearButton() {
+            const confirmChecked = $('#confirmClear').is(':checked');
+            $('#confirmClearBtn').prop('disabled', !confirmChecked);
         }
     </script>
 </body>
