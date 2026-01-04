@@ -2,6 +2,29 @@
 session_start();
 require_once 'config.php';
 
+// Import the logging function
+function logSystemAction($user_id, $action, $module, $details = null) {
+    global $conn;
+    
+    try {
+        $ip_address = $_SERVER['REMOTE_ADDR'] ?? 'Unknown';
+        $user_agent = $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown';
+        
+        $stmt = $conn->prepare("
+            INSERT INTO system_logs (user_id, action, module, details, ip_address, user_agent) 
+            VALUES (?, ?, ?, ?, ?, ?)
+        ");
+        $stmt->bind_param("issssss", $user_id, $action, $module, $details, $ip_address, $user_agent);
+        $stmt->execute();
+        $stmt->close();
+        
+        return true;
+    } catch (Exception $e) {
+        error_log("Failed to log system action: " . $e->getMessage());
+        return false;
+    }
+}
+
 // Generate CSRF token
 if (!isset($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
@@ -44,14 +67,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $error = "Invalid email format.";
             $_SESSION['login_attempts']++;
             $_SESSION['last_attempt_time'] = time();
+            logSystemAction(null, 'login_failed', 'authentication', "Invalid email format: {$email}");
         } elseif (empty($password)) {
             $error = "Password is required.";
             $_SESSION['login_attempts']++;
             $_SESSION['last_attempt_time'] = time();
+            logSystemAction(null, 'login_failed', 'authentication', "Empty password for email: {$email}");
         } elseif (strlen($password) < 8) {
             $error = "Password must be at least 8 characters long.";
             $_SESSION['login_attempts']++;
             $_SESSION['last_attempt_time'] = time();
+            logSystemAction(null, 'login_failed', 'authentication', "Password too short for email: {$email}");
         } else {
             try {
                 // Prepare and execute query with parameterized statements
@@ -73,6 +99,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         $error = "Account is deactivated. Please contact administrator.";
                         $_SESSION['login_attempts']++;
                         $_SESSION['last_attempt_time'] = time();
+                        logSystemAction($user['id'], 'login_failed', 'authentication', "Account deactivated for user: {$user['first_name']} {$user['last_name']} ({$email})");
                     } elseif (!password_verify($password, $user['password_hash'])) {
                         // Invalid password - use generic error message for security
                         $error = "Invalid email or password.";
@@ -80,7 +107,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         $_SESSION['last_attempt_time'] = time();
                         
                         // Log failed login attempt
-                        error_log("Failed login attempt for email: " . $email . " from IP: " . $_SERVER['REMOTE_ADDR']);
+                        logSystemAction($user['id'], 'login_failed', 'authentication', "Invalid password for user: {$user['first_name']} {$user['last_name']} ({$email})");
                     } else {
                         // Successful login - reset attempts
                         $_SESSION['login_attempts'] = 0;
@@ -101,7 +128,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         $_SESSION['user_agent'] = $_SERVER['HTTP_USER_AGENT'];
                         
                         // Log successful login
-                        error_log("Successful login for user ID: " . $user['id'] . " from IP: " . $_SERVER['REMOTE_ADDR']);
+                        logSystemAction($user['id'], 'login_success', 'authentication', "User logged in: {$user['first_name']} {$user['last_name']} ({$email}) with role: {$user['role']}");
                         
                         // Redirect based on role
                         $allowed_roles = ['system_admin', 'admin', 'office_admin', 'user'];
@@ -132,7 +159,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $_SESSION['last_attempt_time'] = time();
                     
                     // Log failed attempt
-                    error_log("Failed login attempt for unknown email: " . $email . " from IP: " . $_SERVER['REMOTE_ADDR']);
+                    logSystemAction(null, 'login_failed', 'authentication', "User not found for email: {$email}");
                 }
                 
                 $stmt->close();

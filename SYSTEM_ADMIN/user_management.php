@@ -24,6 +24,29 @@ require_once 'PHPMailer/PHPMailer-7.0.0/src/Exception.php';
 require_once 'PHPMailer/PHPMailer-7.0.0/src/PHPMailer.php';
 require_once 'PHPMailer/PHPMailer-7.0.0/src/SMTP.php';
 
+// Function to log system actions
+function logSystemAction($user_id, $action, $module, $details = null) {
+    global $conn;
+    
+    try {
+        $ip_address = $_SERVER['REMOTE_ADDR'] ?? 'Unknown';
+        $user_agent = $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown';
+        
+        $stmt = $conn->prepare("
+            INSERT INTO system_logs (user_id, action, module, details, ip_address, user_agent) 
+            VALUES (?, ?, ?, ?, ?, ?)
+        ");
+        $stmt->bind_param("issssss", $user_id, $action, $module, $details, $ip_address, $user_agent);
+        $stmt->execute();
+        $stmt->close();
+        
+        return true;
+    } catch (Exception $e) {
+        error_log("Failed to log system action: " . $e->getMessage());
+        return false;
+    }
+}
+
 // Handle form submissions
 $message = '';
 $message_type = '';
@@ -273,6 +296,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 $stmt->bind_param("ssssss", $username, $email, $password_hash, $role, $first_name, $last_name);
                 
                 if ($stmt->execute()) {
+                    // Log user creation
+                    logSystemAction($_SESSION['user_id'], 'create_user', 'users', "Created user: {$first_name} {$last_name} ({$email}) with role: {$role}");
+                    
                     // Send welcome email with credentials
                     $email_sent = sendWelcomeEmail($email, $first_name, $last_name, $username, $password);
                     
@@ -318,6 +344,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             $stmt->bind_param("ii", $new_status, $user_id);
             
             if ($stmt->execute()) {
+                // Log status change
+                $status_text = $new_status ? 'activated' : 'deactivated';
+                logSystemAction($_SESSION['user_id'], 'toggle_user_status', 'users', "User {$user_id} {$status_text}");
+                
                 $message = 'User status updated successfully';
                 $message_type = 'success';
             } else {
@@ -375,19 +405,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                     $stmt->bind_param("sssssi", $username, $email, $role, $first_name, $last_name, $user_id);
                     
                     if ($stmt->execute()) {
-                        // Send update notification email
-                        $email_sent = sendUserUpdateEmail($email, $first_name, $last_name, $username, $role);
-                        
-                        if ($email_sent) {
-                            $message = 'User updated successfully. Notification email sent.';
-                        } else {
-                            $message = 'User updated successfully, but failed to send notification email.';
-                        }
-                        $message_type = 'success';
+                    // Log user update
+                    logSystemAction($_SESSION['user_id'], 'update_user', 'users', "Updated user {$user_id}: {$first_name} {$last_name} ({$email}), role: {$role}");
+                    
+                    // Send update notification email
+                    $email_sent = sendUserUpdateEmail($email, $first_name, $last_name, $username, $role);
+                    
+                    if ($email_sent) {
+                        $message = 'User updated successfully. Notification email sent.';
                     } else {
-                        $message = 'Error updating user';
-                        $message_type = 'danger';
+                        $message = 'User updated successfully, but failed to send notification email.';
                     }
+                    $message_type = 'success';
+                } else {
+                    $message = 'Error updating user';
+                    $message_type = 'danger';
+                }
                     $stmt->close();
                 }
             }
@@ -488,6 +521,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $conn->commit();
         $message = 'Role permissions updated successfully';
         $message_type = 'success';
+        
+        // Log role permissions update
+        logSystemAction($_SESSION['user_id'], 'update_role_permissions', 'permissions', "Updated permissions for role: {$role}");
         
     } catch (Exception $e) {
         $conn->rollback();
@@ -941,13 +977,13 @@ try {
                 <i class="bi bi-cloud-download"></i>
                 Backup System
             </a>
-            <a href="#" class="sidebar-nav-item">
+            <a href="logs.php" class="sidebar-nav-item">
                 <i class="bi bi-clock-history"></i>
                 System Logs
             </a>
             <div class="sidebar-nav-item" style="margin-top: 2rem; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 2rem;">
                 <i class="bi bi-box-arrow-right"></i>
-                <a href="../logout.php" style="color: inherit; text-decoration: none;">Logout</a>
+                <a href="../logout.php" onclick="event.preventDefault(); confirmLogout();" style="color: inherit; text-decoration: none;">Logout</a>
             </div>
         </nav>
     </aside>
@@ -1341,6 +1377,35 @@ try {
         </div>
     </div>
     
+    <!-- Logout Confirmation Modal -->
+    <div class="modal fade" id="logoutModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-warning text-dark">
+                    <h5 class="modal-title"><i class="bi bi-exclamation-triangle"></i> Confirm Logout</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="text-center mb-3">
+                        <i class="bi bi-box-arrow-right fs-1 text-warning"></i>
+                    </div>
+                    <h6 class="text-center mb-3">Are you sure you want to logout?</h6>
+                    <p class="text-muted text-center mb-0">
+                        You will be logged out of the Pilar Inventory Management System. Any unsaved work will be lost.
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle"></i> Cancel
+                    </button>
+                    <a href="../logout.php" class="btn btn-warning">
+                        <i class="bi bi-box-arrow-right"></i> Logout
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <!-- jQuery -->
@@ -1467,7 +1532,7 @@ try {
             });
         }
         
-        // Clear form on modal close
+        // Clear form on edit modal close
         document.getElementById('addUserModal').addEventListener('hidden.bs.modal', function () {
             this.querySelector('form').reset();
         });
@@ -1497,6 +1562,26 @@ try {
             .catch(error => {
                 console.error('Error:', error);
                 alert('Error updating user');
+            });
+        });
+        
+        // Logout confirmation
+        function confirmLogout() {
+            const logoutModal = new bootstrap.Modal(document.getElementById('logoutModal'));
+            logoutModal.show();
+        }
+        
+        // Update all logout links to use confirmation
+        document.addEventListener('DOMContentLoaded', function() {
+            const logoutLinks = document.querySelectorAll('a[href="../logout.php"]');
+            logoutLinks.forEach(link => {
+                // Don't intercept the logout button inside the modal
+                if (!link.closest('#logoutModal')) {
+                    link.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        confirmLogout();
+                    });
+                }
             });
         });
         
