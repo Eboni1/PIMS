@@ -36,7 +36,7 @@ function logSystemAction($user_id, $action, $module, $details = null) {
             INSERT INTO system_logs (user_id, action, module, details, ip_address, user_agent) 
             VALUES (?, ?, ?, ?, ?, ?)
         ");
-        $stmt->bind_param("issssss", $user_id, $action, $module, $details, $ip_address, $user_agent);
+        $stmt->bind_param("isssss", $user_id, $action, $module, $details, $ip_address, $user_agent);
         $stmt->execute();
         $stmt->close();
         

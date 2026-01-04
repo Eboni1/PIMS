@@ -26,7 +26,7 @@ function logSystemAction($user_id, $action, $module, $details = null) {
             INSERT INTO system_logs (user_id, action, module, details, ip_address, user_agent) 
             VALUES (?, ?, ?, ?, ?, ?)
         ");
-        $stmt->bind_param("issssss", $user_id, $action, $module, $details, $ip_address, $user_agent);
+        $stmt->bind_param("isssss", $user_id, $action, $module, $details, $ip_address, $user_agent);
         $stmt->execute();
         $stmt->close();
         
@@ -37,99 +37,34 @@ function logSystemAction($user_id, $action, $module, $details = null) {
     }
 }
 
-// Get logs with filters
+// Get all logs for DataTables
 $logs = [];
 $total_logs = 0;
-$page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
-$per_page = 50;
-$offset = ($page - 1) * $per_page;
-
-// Filter parameters
-$filter_user = isset($_GET['filter_user']) ? $_GET['filter_user'] : '';
-$filter_action = isset($_GET['filter_action']) ? $_GET['filter_action'] : '';
-$filter_module = isset($_GET['filter_module']) ? $_GET['filter_module'] : '';
-$filter_date_from = isset($_GET['filter_date_from']) ? $_GET['filter_date_from'] : '';
-$filter_date_to = isset($_GET['filter_date_to']) ? $_GET['filter_date_to'] : '';
 
 try {
-    // Build WHERE clause
-    $where_conditions = [];
-    $params = [];
-    $types = '';
-    
-    if (!empty($filter_user)) {
-        $where_conditions[] = "sl.user_id = ?";
-        $params[] = $filter_user;
-        $types .= 'i';
-    }
-    
-    if (!empty($filter_action)) {
-        $where_conditions[] = "sl.action LIKE ?";
-        $params[] = '%' . $filter_action . '%';
-        $types .= 's';
-    }
-    
-    if (!empty($filter_module)) {
-        $where_conditions[] = "sl.module = ?";
-        $params[] = $filter_module;
-        $types .= 's';
-    }
-    
-    if (!empty($filter_date_from)) {
-        $where_conditions[] = "DATE(sl.created_at) >= ?";
-        $params[] = $filter_date_from;
-        $types .= 's';
-    }
-    
-    if (!empty($filter_date_to)) {
-        $where_conditions[] = "DATE(sl.created_at) <= ?";
-        $params[] = $filter_date_to;
-        $types .= 's';
-    }
-    
-    $where_clause = !empty($where_conditions) ? 'WHERE ' . implode(' AND ', $where_conditions) : '';
-    
-    // Get total count
-    $count_sql = "SELECT COUNT(*) as total FROM system_logs sl LEFT JOIN users u ON sl.user_id = u.id $where_clause";
-    $stmt = $conn->prepare($count_sql);
-    if (!empty($params)) {
-        $stmt->bind_param($types, ...$params);
-    }
-    $stmt->execute();
-    $total_logs = $stmt->get_result()->fetch_assoc()['total'];
-    $stmt->close();
-    
-    // Get logs with pagination
+    // Get all logs without pagination for DataTables
     $sql = "
         SELECT sl.*, u.first_name, u.last_name, u.username 
         FROM system_logs sl 
         LEFT JOIN users u ON sl.user_id = u.id 
-        $where_clause 
-        ORDER BY sl.created_at DESC 
-        LIMIT ? OFFSET ?
+        ORDER BY sl.created_at DESC
     ";
     
     $stmt = $conn->prepare($sql);
-    $params[] = $per_page;
-    $params[] = $offset;
-    $types .= 'ii';
-    
-    if (!empty($params)) {
-        $stmt->bind_param($types, ...$params);
-    }
     $stmt->execute();
     $result = $stmt->get_result();
     
     while ($row = $result->fetch_assoc()) {
         $logs[] = $row;
     }
+    $total_logs = count($logs);
     $stmt->close();
     
 } catch (Exception $e) {
     error_log("Error fetching logs: " . $e->getMessage());
 }
 
-// Get users for filter dropdown
+// Get users for filter dropdown (keeping for potential future use)
 $users = [];
 try {
     $stmt = $conn->prepare("SELECT id, first_name, last_name, username FROM users ORDER BY first_name, last_name");
@@ -144,7 +79,7 @@ try {
     error_log("Error fetching users: " . $e->getMessage());
 }
 
-// Get unique actions for filter
+// Get unique actions for filter (keeping for potential future use)
 $actions = [];
 try {
     $stmt = $conn->prepare("SELECT DISTINCT action FROM system_logs ORDER BY action");
@@ -159,7 +94,7 @@ try {
     error_log("Error fetching actions: " . $e->getMessage());
 }
 
-// Get unique modules for filter
+// Get unique modules for filter (keeping for potential future use)
 $modules = [];
 try {
     $stmt = $conn->prepare("SELECT DISTINCT module FROM system_logs ORDER BY module");
@@ -173,9 +108,6 @@ try {
 } catch (Exception $e) {
     error_log("Error fetching modules: " . $e->getMessage());
 }
-
-// Calculate pagination
-$total_pages = ceil($total_logs / $per_page);
 ?>
 
 <!DOCTYPE html>
@@ -188,6 +120,8 @@ $total_pages = ceil($total_logs / $per_page);
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Bootstrap Icons -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.3/font/bootstrap-icons.css">
+    <!-- DataTables CSS -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <!-- Custom CSS -->
@@ -314,59 +248,6 @@ $page_title = 'System Logs';
                 </div>
             </div>
             
-            <!-- Filter Section -->
-            <div class="filter-section">
-                <form method="GET" class="row g-3">
-                    <div class="col-md-3">
-                        <label for="filter_user" class="form-label">User</label>
-                        <select class="form-control" id="filter_user" name="filter_user">
-                            <option value="">All Users</option>
-                            <?php foreach ($users as $user): ?>
-                                <option value="<?php echo $user['id']; ?>" <?php echo $filter_user == $user['id'] ? 'selected' : ''; ?>>
-                                    <?php echo htmlspecialchars($user['first_name'] . ' ' . $user['last_name']); ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="col-md-2">
-                        <label for="filter_action" class="form-label">Action</label>
-                        <select class="form-control" id="filter_action" name="filter_action">
-                            <option value="">All Actions</option>
-                            <?php foreach ($actions as $action): ?>
-                                <option value="<?php echo $action; ?>" <?php echo $filter_action == $action ? 'selected' : ''; ?>>
-                                    <?php echo htmlspecialchars($action); ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="col-md-2">
-                        <label for="filter_module" class="form-label">Module</label>
-                        <select class="form-control" id="filter_module" name="filter_module">
-                            <option value="">All Modules</option>
-                            <?php foreach ($modules as $module): ?>
-                                <option value="<?php echo $module; ?>" <?php echo $filter_module == $module ? 'selected' : ''; ?>>
-                                    <?php echo htmlspecialchars(ucfirst($module)); ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="col-md-2">
-                        <label for="filter_date_from" class="form-label">From Date</label>
-                        <input type="date" class="form-control" id="filter_date_from" name="filter_date_from" value="<?php echo htmlspecialchars($filter_date_from); ?>">
-                    </div>
-                    <div class="col-md-2">
-                        <label for="filter_date_to" class="form-label">To Date</label>
-                        <input type="date" class="form-control" id="filter_date_to" name="filter_date_to" value="<?php echo htmlspecialchars($filter_date_to); ?>">
-                    </div>
-                    <div class="col-md-1">
-                        <label class="form-label">&nbsp;</label>
-                        <button type="submit" class="btn btn-primary w-100">
-                            <i class="bi bi-search"></i> Filter
-                        </button>
-                    </div>
-                </form>
-            </div>
-            
             <!-- Logs Display -->
             <div class="row">
                 <div class="col-12">
@@ -384,110 +265,211 @@ $page_title = 'System Logs';
                                     <p class="text-muted mt-3">No logs found</p>
                                 </div>
                             <?php else: ?>
-                                <?php foreach ($logs as $log): ?>
-                                    <?php
-                                    $logClass = 'info';
-                                    if (strpos($log['action'], 'delete') !== false || strpos($log['action'], 'error') !== false) {
-                                        $logClass = 'error';
-                                    } elseif (strpos($log['action'], 'update') !== false || strpos($log['action'], 'edit') !== false) {
-                                        $logClass = 'warning';
-                                    } elseif (strpos($log['action'], 'create') !== false || strpos($log['action'], 'add') !== false || strpos($log['action'], 'login') !== false) {
-                                        $logClass = 'success';
-                                    }
-                                    ?>
-                                    <div class="log-entry <?php echo $logClass; ?>">
-                                        <div class="row align-items-center">
-                                            <div class="col-md-8">
-                                                <div class="d-flex align-items-center mb-2">
-                                                    <span class="action-badge bg-<?php echo $logClass === 'error' ? 'danger' : ($logClass === 'warning' ? 'warning' : ($logClass === 'success' ? 'success' : 'info')); ?> text-white me-2">
-                                                        <?php echo htmlspecialchars($log['action']); ?>
-                                                    </span>
-                                                    <span class="badge bg-secondary me-2">
-                                                        <?php echo htmlspecialchars(ucfirst($log['module'])); ?>
-                                                    </span>
-                                                    <small class="text-muted">
-                                                        <?php echo date('M j, Y H:i:s', strtotime($log['created_at'])); ?>
-                                                    </small>
-                                                </div>
-                                                <div>
-                                                    <strong>User:</strong> 
-                                                    <?php 
-                                                    if ($log['user_id']) {
-                                                        echo htmlspecialchars($log['first_name'] . ' ' . $log['last_name'] . ' (@' . $log['username'] . ')');
-                                                    } else {
-                                                        echo 'System';
-                                                    }
-                                                    ?>
-                                                </div>
-                                                <?php if (!empty($log['details'])): ?>
-                                                    <div class="mt-2">
+                                <div class="table-responsive">
+                                    <table id="logsTable" class="table table-hover mb-0">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Action</th>
+                                                <th>Module</th>
+                                                <th>User</th>
+                                                <th>Details</th>
+                                                <th>Date/Time</th>
+                                                <th>IP Address</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <?php foreach ($logs as $log): ?>
+                                                <?php
+                                                $logClass = 'info';
+                                                if (strpos($log['action'], 'delete') !== false || strpos($log['action'], 'error') !== false) {
+                                                    $logClass = 'error';
+                                                } elseif (strpos($log['action'], 'update') !== false || strpos($log['action'], 'edit') !== false) {
+                                                    $logClass = 'warning';
+                                                } elseif (strpos($log['action'], 'create') !== false || strpos($log['action'], 'add') !== false || strpos($log['action'], 'login') !== false) {
+                                                    $logClass = 'success';
+                                                }
+                                                ?>
+                                                <tr class="log-entry-<?php echo $logClass; ?>">
+                                                    <td>
+                                                        <span class="action-badge bg-<?php echo $logClass === 'error' ? 'danger' : ($logClass === 'warning' ? 'warning' : ($logClass === 'success' ? 'success' : 'info')); ?> text-white">
+                                                            <?php echo htmlspecialchars($log['action']); ?>
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <span class="badge bg-secondary">
+                                                            <?php echo htmlspecialchars(ucfirst($log['module'])); ?>
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <?php 
+                                                        if ($log['user_id']) {
+                                                            echo htmlspecialchars($log['first_name'] . ' ' . $log['last_name'] . ' (@' . $log['username'] . ')');
+                                                        } else {
+                                                            echo 'System';
+                                                        }
+                                                        ?>
+                                                    </td>
+                                                    <td>
                                                         <small class="text-muted">
-                                                            <strong>Details:</strong> <?php echo htmlspecialchars($log['details']); ?>
+                                                            <?php echo !empty($log['details']) ? htmlspecialchars(substr($log['details'], 0, 100)) . (strlen($log['details']) > 100 ? '...' : '') : 'No details'; ?>
                                                         </small>
-                                                    </div>
-                                                <?php endif; ?>
-                                                <div class="mt-1">
-                                                    <small class="text-muted">
-                                                        <strong>IP:</strong> <?php echo htmlspecialchars($log['ip_address']); ?> | 
-                                                        <strong>Agent:</strong> <?php echo htmlspecialchars(substr($log['user_agent'], 0, 50)) . '...'; ?>
-                                                    </small>
-                                                </div>
-                                            </div>
-                                            <div class="col-md-4 text-end">
-                                                <div class="btn-group" role="group">
-                                                    <button class="btn btn-sm btn-outline-primary" onclick="viewLogDetails(<?php echo $log['id']; ?>)">
-                                                        <i class="bi bi-eye"></i> Details
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                <?php endforeach; ?>
+                                                    </td>
+                                                    <td>
+                                                        <small class="text-muted">
+                                                            <?php echo date('M j, Y H:i:s', strtotime($log['created_at'])); ?>
+                                                        </small>
+                                                    </td>
+                                                    <td>
+                                                        <small class="text-muted">
+                                                            <?php echo htmlspecialchars($log['ip_address']); ?>
+                                                        </small>
+                                                    </td>
+                                                    <td>
+                                                        <button class="btn btn-sm btn-outline-primary" onclick="viewLogDetails(<?php echo $log['id']; ?>)">
+                                                            <i class="bi bi-eye"></i> Details
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
                             <?php endif; ?>
                         </div>
                     </div>
                 </div>
             </div>
             
-            <!-- Pagination -->
-            <?php if ($total_pages > 1): ?>
-                <div class="row mt-4">
-                    <div class="col-12">
-                        <nav aria-label="Logs pagination">
-                            <ul class="pagination justify-content-center">
-                                <?php if ($page > 1): ?>
-                                    <li class="page-item">
-                                        <a class="page-link" href="?page=<?php echo $page - 1; ?><?php echo !empty($filter_user) ? '&filter_user=' . urlencode($filter_user) : ''; ?><?php echo !empty($filter_action) ? '&filter_action=' . urlencode($filter_action) : ''; ?><?php echo !empty($filter_module) ? '&filter_module=' . urlencode($filter_module) : ''; ?><?php echo !empty($filter_date_from) ? '&filter_date_from=' . urlencode($filter_date_from) : ''; ?><?php echo !empty($filter_date_to) ? '&filter_date_to=' . urlencode($filter_date_to) : ''; ?>">
-                                            Previous
-                                        </a>
-                                    </li>
-                                <?php endif; ?>
-                                
-                                <?php
-                                $start_page = max(1, $page - 2);
-                                $end_page = min($total_pages, $page + 2);
-                                
-                                for ($i = $start_page; $i <= $end_page; $i++):
-                                ?>
-                                    <li class="page-item <?php echo $i == $page ? 'active' : ''; ?>">
-                                        <a class="page-link" href="?page=<?php echo $i; ?><?php echo !empty($filter_user) ? '&filter_user=' . urlencode($filter_user) : ''; ?><?php echo !empty($filter_action) ? '&filter_action=' . urlencode($filter_action) : ''; ?><?php echo !empty($filter_module) ? '&filter_module=' . urlencode($filter_module) : ''; ?><?php echo !empty($filter_date_from) ? '&filter_date_from=' . urlencode($filter_date_from) : ''; ?><?php echo !empty($filter_date_to) ? '&filter_date_to=' . urlencode($filter_date_to) : ''; ?>">
-                                            <?php echo $i; ?>
-                                        </a>
-                                    </li>
-                                <?php endfor; ?>
-                                
-                                <?php if ($page < $total_pages): ?>
-                                    <li class="page-item">
-                                        <a class="page-link" href="?page=<?php echo $page + 1; ?><?php echo !empty($filter_user) ? '&filter_user=' . urlencode($filter_user) : ''; ?><?php echo !empty($filter_action) ? '&filter_action=' . urlencode($filter_action) : ''; ?><?php echo !empty($filter_module) ? '&filter_module=' . urlencode($filter_module) : ''; ?><?php echo !empty($filter_date_from) ? '&filter_date_from=' . urlencode($filter_date_from) : ''; ?><?php echo !empty($filter_date_to) ? '&filter_date_to=' . urlencode($filter_date_to) : ''; ?>">
-                                            Next
-                                        </a>
-                                    </li>
-                                <?php endif; ?>
-                            </ul>
-                        </nav>
+            <!-- DataTables handles pagination automatically -->
+        </div>
+    </div>
+    
+    <!-- Log Details Modal -->
+    <div class="modal fade" id="logDetailsModal" tabindex="-1" aria-labelledby="logDetailsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title" id="logDetailsModalLabel">
+                        <i class="bi bi-clock-history"></i> Log Entry Details
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="logDetailsContent">
+                        <!-- Log details will be loaded here -->
                     </div>
                 </div>
-            <?php endif; ?>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Export Logs Modal -->
+    <div class="modal fade" id="exportLogsModal" tabindex="-1" aria-labelledby="exportLogsModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title" id="exportLogsModalLabel">
+                        <i class="bi bi-download"></i> Export System Logs
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Choose your export format and options:</p>
+                    <div class="mb-3">
+                        <label for="exportFormat" class="form-label">Export Format</label>
+                        <select class="form-select" id="exportFormat">
+                            <option value="csv">CSV (Comma Separated Values)</option>
+                            <option value="excel">Excel (XLSX)</option>
+                            <option value="json">JSON</option>
+                            <option value="pdf">PDF</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="exportDateRange" class="form-label">Date Range</label>
+                        <select class="form-select" id="exportDateRange">
+                            <option value="all">All Logs</option>
+                            <option value="today">Today</option>
+                            <option value="week">Last 7 Days</option>
+                            <option value="month">Last 30 Days</option>
+                            <option value="custom">Custom Range</option>
+                        </select>
+                    </div>
+                    <div id="customDateRange" class="mb-3" style="display: none;">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <label for="exportDateFrom" class="form-label">From Date</label>
+                                <input type="date" class="form-control" id="exportDateFrom">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="exportDateTo" class="form-label">To Date</label>
+                                <input type="date" class="form-control" id="exportDateTo">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="includeUserAgent" checked>
+                            <label class="form-check-label" for="includeUserAgent">
+                                Include User Agent Information
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-success" onclick="performExport()">
+                        <i class="bi bi-download"></i> Export Logs
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Clear Logs Modal -->
+    <div class="modal fade" id="clearLogsModal" tabindex="-1" aria-labelledby="clearLogsModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title" id="clearLogsModalLabel">
+                        <i class="bi bi-exclamation-triangle"></i> Clear System Logs
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-warning" role="alert">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        <strong>Warning:</strong> This action cannot be undone!
+                    </div>
+                    <p>Are you sure you want to clear the system logs? This will permanently delete all log entries.</p>
+                    <div class="mb-3">
+                        <label for="clearLogsRange" class="form-label">Clear Range</label>
+                        <select class="form-select" id="clearLogsRange">
+                            <option value="all">All Logs</option>
+                            <option value="older_than_30">Older than 30 days</option>
+                            <option value="older_than_90">Older than 90 days</option>
+                            <option value="older_than_365">Older than 1 year</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="confirmClear">
+                            <label class="form-check-label" for="confirmClear">
+                                I understand that this action cannot be undone
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-danger" onclick="performClearLogs()" id="confirmClearBtn" disabled>
+                        <i class="bi bi-trash"></i> Clear Logs
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
     
@@ -496,34 +478,242 @@ $page_title = 'System Logs';
     
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+    <!-- DataTables JS -->
+    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
     <script>
         <?php require_once 'includes/sidebar-scripts.php'; ?>
         
+        $(document).ready(function() {
+            // Initialize DataTables
+            $('#logsTable').DataTable({
+                responsive: true,
+                pageLength: 25,
+                lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
+                order: [[4, 'desc']], // Sort by date/time column by default
+                columnDefs: [
+                    { targets: 0, width: '120px' }, // Action
+                    { targets: 1, width: '100px' }, // Module
+                    { targets: 2, width: '200px' }, // User
+                    { targets: 3, width: '300px' }, // Details
+                    { targets: 4, width: '150px' }, // Date/Time
+                    { targets: 5, width: '120px' }, // IP Address
+                    { targets: 6, width: '80px', orderable: false } // Actions
+                ],
+                language: {
+                    search: "Search logs:",
+                    lengthMenu: "Show _MENU_ logs per page",
+                    info: "Showing _START_ to _END_ of _TOTAL_ logs",
+                    infoEmpty: "Showing 0 to 0 of 0 logs",
+                    infoFiltered: "(filtered from _MAX_ total logs)",
+                    zeroRecords: "No matching logs found",
+                    emptyTable: "No logs available in table",
+                    paginate: {
+                        first: "First",
+                        last: "Last",
+                        next: "Next",
+                        previous: "Previous"
+                    }
+                },
+                dom: "<'row'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6'f>>" +
+                     "<'row'<'col-sm-12'tr>>" +
+                     "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>"
+            });
+            
+            // Export date range toggle
+            $('#exportDateRange').change(function() {
+                if ($(this).val() === 'custom') {
+                    $('#customDateRange').show();
+                } else {
+                    $('#customDateRange').hide();
+                }
+            });
+            
+            // Clear logs confirmation toggle
+            $('#confirmClear').change(function() {
+                $('#confirmClearBtn').prop('disabled', !$(this).is(':checked'));
+            });
+        });
+        
         // View log details
         function viewLogDetails(logId) {
-            // This would open a modal with full log details
-            alert('Log details view would open here for log ID: ' + logId);
+            // Fetch log details via AJAX
+            $.ajax({
+                url: 'ajax/get_log_details.php',
+                method: 'POST',
+                data: { log_id: logId },
+                success: function(response) {
+                    const logData = JSON.parse(response);
+                    if (logData.success) {
+                        const log = logData.log;
+                        const logClass = getLogClass(log.action);
+                        
+                        const detailsHtml = `
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6 class="text-primary">Basic Information</h6>
+                                    <table class="table table-sm">
+                                        <tr><td><strong>ID:</strong></td><td>${log.id}</td></tr>
+                                        <tr><td><strong>Action:</strong></td><td><span class="badge bg-${getBadgeColor(logClass)}">${log.action}</span></td></tr>
+                                        <tr><td><strong>Module:</strong></td><td><span class="badge bg-secondary">${log.module}</span></td></tr>
+                                        <tr><td><strong>Date/Time:</strong></td><td>${formatDateTime(log.created_at)}</td></tr>
+                                    </table>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6 class="text-primary">User Information</h6>
+                                    <table class="table table-sm">
+                                        <tr><td><strong>Name:</strong></td><td>${log.user_id ? log.first_name + ' ' + log.last_name : 'System'}</td></tr>
+                                        <tr><td><strong>Username:</strong></td><td>${log.username || 'N/A'}</td></tr>
+                                        <tr><td><strong>User ID:</strong></td><td>${log.user_id || 'N/A'}</td></tr>
+                                    </table>
+                                </div>
+                            </div>
+                            <div class="row mt-3">
+                                <div class="col-12">
+                                    <h6 class="text-primary">Details</h6>
+                                    <div class="alert alert-light">
+                                        ${log.details || 'No details available'}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6 class="text-primary">Network Information</h6>
+                                    <table class="table table-sm">
+                                        <tr><td><strong>IP Address:</strong></td><td>${log.ip_address}</td></tr>
+                                        <tr><td><strong>User Agent:</strong></td><td><small>${log.user_agent}</small></td></tr>
+                                    </table>
+                                </div>
+                            </div>
+                        `;
+                        
+                        $('#logDetailsContent').html(detailsHtml);
+                        $('#logDetailsModal').modal('show');
+                    } else {
+                        alert('Error loading log details: ' + logData.message);
+                    }
+                },
+                error: function() {
+                    alert('Error loading log details. Please try again.');
+                }
+            });
         }
         
-        // Clear logs
-        function clearLogs() {
-            if (confirm('Are you sure you want to clear all system logs? This action cannot be undone.')) {
-                // This would send a request to clear logs
-                alert('Clear logs functionality would be implemented here');
+        // Helper functions
+        function getLogClass(action) {
+            if (action.includes('delete') || action.includes('error')) return 'error';
+            if (action.includes('update') || action.includes('edit')) return 'warning';
+            if (action.includes('create') || action.includes('add') || action.includes('login')) return 'success';
+            return 'info';
+        }
+        
+        function getBadgeColor(logClass) {
+            switch(logClass) {
+                case 'error': return 'danger';
+                case 'warning': return 'warning';
+                case 'success': return 'success';
+                default: return 'info';
             }
+        }
+        
+        function formatDateTime(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
         }
         
         // Export logs
         function exportLogs() {
-            // This would export logs to CSV or other format
-            alert('Export logs functionality would be implemented here');
+            $('#exportLogsModal').modal('show');
         }
         
-        // Auto-refresh logs every 30 seconds
-        setInterval(function() {
-            console.log('Auto-refreshing logs...');
-            // In production, this would fetch updated data via AJAX
-        }, 30000);
+        function performExport() {
+            const format = $('#exportFormat').val();
+            const dateRange = $('#exportDateRange').val();
+            const includeUserAgent = $('#includeUserAgent').is(':checked');
+            const dateFrom = $('#exportDateFrom').val();
+            const dateTo = $('#exportDateTo').val();
+            
+            // Show loading state
+            const exportBtn = event.target;
+            const originalText = exportBtn.innerHTML;
+            exportBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Exporting...';
+            exportBtn.disabled = true;
+            
+            // Create export parameters
+            const params = new URLSearchParams({
+                format: format,
+                date_range: dateRange,
+                include_user_agent: includeUserAgent ? '1' : '0'
+            });
+            
+            if (dateRange === 'custom' && dateFrom && dateTo) {
+                params.append('date_from', dateFrom);
+                params.append('date_to', dateTo);
+            }
+            
+            // Download the file
+            window.location.href = 'ajax/export_logs.php?' + params.toString();
+            
+            // Reset button after delay
+            setTimeout(() => {
+                exportBtn.innerHTML = originalText;
+                exportBtn.disabled = false;
+                $('#exportLogsModal').modal('hide');
+            }, 2000);
+        }
+        
+        // Clear logs
+        function clearLogs() {
+            $('#clearLogsModal').modal('show');
+        }
+        
+        function performClearLogs() {
+            const range = $('#clearLogsRange').val();
+            
+            if (!$('#confirmClear').is(':checked')) {
+                alert('Please confirm that you understand this action cannot be undone.');
+                return;
+            }
+            
+            // Show loading state
+            const clearBtn = document.getElementById('confirmClearBtn');
+            const originalText = clearBtn.innerHTML;
+            clearBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Clearing...';
+            clearBtn.disabled = true;
+            
+            // Send AJAX request to clear logs
+            $.ajax({
+                url: 'ajax/clear_logs.php',
+                method: 'POST',
+                data: { range: range },
+                success: function(response) {
+                    const result = JSON.parse(response);
+                    if (result.success) {
+                        alert('Logs cleared successfully! ' + result.message);
+                        location.reload(); // Reload to show updated logs
+                    } else {
+                        alert('Error clearing logs: ' + result.message);
+                    }
+                },
+                error: function() {
+                    alert('Error clearing logs. Please try again.');
+                },
+                complete: function() {
+                    clearBtn.innerHTML = originalText;
+                    clearBtn.disabled = false;
+                    $('#clearLogsModal').modal('hide');
+                }
+            });
+        }
     </script>
 </body>
 </html>
