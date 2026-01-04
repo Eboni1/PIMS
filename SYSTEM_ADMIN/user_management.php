@@ -924,91 +924,15 @@ try {
     </style>
 </head>
 <body>
-    <!-- Sidebar Toggle Button -->
-    <button class="sidebar-toggle" id="sidebarToggle">
-        <i class="bi bi-list fs-5"></i>
-    </button>
-    
-    <!-- Sidebar Overlay -->
-    <div class="sidebar-overlay" id="sidebarOverlay"></div>
-    
-    <!-- Sidebar Navigation -->
-    <aside class="sidebar" id="sidebar">
-        <div class="sidebar-header">
-            <h3>
-                <i class="bi bi-box-seam"></i>
-                PIMS Navigation
-            </h3>
-        </div>
-        <nav class="sidebar-nav">
-            <a href="dashboard.php" class="sidebar-nav-item">
-                <i class="bi bi-speedometer2"></i>
-                Dashboard
-            </a>
-            <a href="user_management.php" class="sidebar-nav-item active">
-                <i class="bi bi-people"></i>
-                User Management
-            </a>
-            <a href="#" class="sidebar-nav-item">
-                <i class="bi bi-box"></i>
-                Inventory Management
-            </a>
-            <a href="#" class="sidebar-nav-item">
-                <i class="bi bi-tags"></i>
-                Categories
-            </a>
-            <a href="#" class="sidebar-nav-item">
-                <i class="bi bi-arrow-left-right"></i>
-                Transactions
-            </a>
-            <a href="#" class="sidebar-nav-item">
-                <i class="bi bi-file-text"></i>
-                Reports
-            </a>
-            <a href="#" class="sidebar-nav-item">
-                <i class="bi bi-gear"></i>
-                System Settings
-            </a>
-            <a href="#" class="sidebar-nav-item">
-                <i class="bi bi-shield-exclamation"></i>
-                Security Audit
-            </a>
-            <a href="#" class="sidebar-nav-item">
-                <i class="bi bi-cloud-download"></i>
-                Backup System
-            </a>
-            <a href="logs.php" class="sidebar-nav-item">
-                <i class="bi bi-clock-history"></i>
-                System Logs
-            </a>
-            <div class="sidebar-nav-item" style="margin-top: 2rem; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 2rem;">
-                <i class="bi bi-box-arrow-right"></i>
-                <a href="../logout.php" onclick="event.preventDefault(); confirmLogout();" style="color: inherit; text-decoration: none;">Logout</a>
-            </div>
-        </nav>
-    </aside>
-    
-    <!-- Main Content Wrapper -->
+    <?php
+// Set page title for topbar
+$page_title = 'User Management';
+?>
+<!-- Main Content Wrapper -->
     <div class="main-wrapper" id="mainWrapper">
-        <!-- Navigation -->
-        <nav class="navbar navbar-expand-lg navbar-dark" id="mainNavbar">
-            <div class="container-fluid">
-                <a class="navbar-brand" href="dashboard.php">
-                    <img src="../img/trans_logo.png" alt="PIMS Logo" style="max-height: 30px; border-radius: 4px; margin-right: 10px;">
-                    PILAR INVENTORY MANAGEMENT SYSTEM
-                </a>
-                <div class="navbar-nav ms-auto">
-                    <span class="navbar-text me-3">
-                        <i class="bi bi-person-circle"></i> 
-                        <?php echo htmlspecialchars($_SESSION['first_name'] . ' ' . $_SESSION['last_name']); ?> 
-                        <span class="badge bg-warning text-dark ms-2">System Admin</span>
-                    </span>
-                    <a href="../logout.php" class="btn btn-outline-light btn-sm">
-                        <i class="bi bi-box-arrow-right"></i> Logout
-                    </a>
-                </div>
-            </div>
-        </nav>
+        <?php require_once 'includes/sidebar-toggle.php'; ?>
+        <?php require_once 'includes/sidebar.php'; ?>
+        <?php require_once 'includes/topbar.php'; ?>
     
     <!-- Main Content -->
     <div class="main-content">
@@ -1191,6 +1115,9 @@ try {
         </div>
     </div>
     
+    <?php require_once 'includes/logout-modal.php'; ?>
+    <?php require_once 'includes/change-password-modal.php'; ?>
+    
     <!-- Add User Modal -->
     <div class="modal fade" id="addUserModal" tabindex="-1">
         <div class="modal-dialog modal-lg">
@@ -1372,39 +1299,6 @@ try {
                             </table>
                         </div>
                     </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Logout Confirmation Modal -->
-    <div class="modal fade" id="logoutModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header bg-warning text-dark">
-                    <h5 class="modal-title"><i class="bi bi-exclamation-triangle"></i> Confirm Logout</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="text-center mb-3">
-                        <i class="bi bi-box-arrow-right fs-1 text-warning"></i>
-                    </div>
-                    <h6 class="text-center mb-3">Are you sure you want to logout?</h6>
-                    <p class="text-muted text-center mb-0">
-                        You will be logged out of the Pilar Inventory Management System. Any unsaved work will be lost.
-                    </p>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                        <i class="bi bi-x-circle"></i> Cancel
-                    </button>
-                    <a href="../logout.php" class="btn btn-warning">
-                        <i class="bi bi-box-arrow-right"></i> Logout
-                    </a>
-                </div>
-            </div>
-        </div>
-    </div>
     
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
@@ -1414,36 +1308,7 @@ try {
     <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
     <script>
-        // Sidebar Toggle Functionality
-        const sidebarToggle = document.getElementById('sidebarToggle');
-        const sidebar = document.getElementById('sidebar');
-        const sidebarOverlay = document.getElementById('sidebarOverlay');
-        const mainWrapper = document.getElementById('mainWrapper');
-        const mainNavbar = document.getElementById('mainNavbar');
-        
-        function toggleSidebar() {
-            sidebar.classList.toggle('active');
-            sidebarOverlay.classList.toggle('active');
-            mainWrapper.classList.toggle('sidebar-active');
-            sidebarToggle.classList.toggle('sidebar-active');
-        }
-        
-        function closeSidebar() {
-            sidebar.classList.remove('active');
-            sidebarOverlay.classList.remove('active');
-            mainWrapper.classList.remove('sidebar-active');
-            sidebarToggle.classList.remove('sidebar-active');
-        }
-        
-        sidebarToggle.addEventListener('click', toggleSidebar);
-        sidebarOverlay.addEventListener('click', closeSidebar);
-        
-        // Close sidebar on escape key
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape' && sidebar.classList.contains('active')) {
-                closeSidebar();
-            }
-        });
+        <?php require_once 'includes/sidebar-scripts.php'; ?>
         
         // Initialize DataTable
         $(document).ready(function() {
@@ -1562,26 +1427,6 @@ try {
             .catch(error => {
                 console.error('Error:', error);
                 alert('Error updating user');
-            });
-        });
-        
-        // Logout confirmation
-        function confirmLogout() {
-            const logoutModal = new bootstrap.Modal(document.getElementById('logoutModal'));
-            logoutModal.show();
-        }
-        
-        // Update all logout links to use confirmation
-        document.addEventListener('DOMContentLoaded', function() {
-            const logoutLinks = document.querySelectorAll('a[href="../logout.php"]');
-            logoutLinks.forEach(link => {
-                // Don't intercept the logout button inside the modal
-                if (!link.closest('#logoutModal')) {
-                    link.addEventListener('click', function(e) {
-                        e.preventDefault();
-                        confirmLogout();
-                    });
-                }
             });
         });
         
