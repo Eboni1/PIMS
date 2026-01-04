@@ -13,6 +13,7 @@ if ($_SESSION['role'] !== 'system_admin') {
 }
 
 require_once '../config.php';
+require_once 'includes/cloud_api.php';
 
 // Function to log system actions (if not already defined)
 if (!function_exists('logSystemAction')) {
@@ -89,12 +90,25 @@ if (!function_exists('backupDatabasePHP')) {
     }
 }
 
+// Simulate cloud upload function (replace with actual implementation)
+if (!function_exists('simulateCloudUpload')) {
+    function simulateCloudUpload($backup_data, $provider) {
+        // Simulate upload delay
+        sleep(2);
+        
+        // Simulate 80% success rate for demo
+        return rand(1, 100) <= 80;
+    }
+}
+
 // Handle backup creation
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_backup'])) {
     $backup_name = trim($_POST['backup_name']);
     $backup_type = $_POST['backup_type'];
     $include_files = isset($_POST['include_files']);
     $include_database = isset($_POST['include_database']);
+    $online_backup = isset($_POST['online_backup']);
+    $cloud_provider = $online_backup ? $_POST['cloud_provider'] : null;
     
     $errors = [];
     
@@ -126,6 +140,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_backup'])) {
                 $backup_details = "Backup: $backup_name, Type: $backup_type";
                 if ($include_files) $backup_details .= ", Files: Yes";
                 if ($include_database) $backup_details .= ", Database: Yes";
+                if ($online_backup) $backup_details .= ", Online: Yes ($cloud_provider)";
                 
                 if ($include_database) {
                     // Database backup with better error handling
@@ -205,15 +220,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_backup'])) {
                 if (empty($errors)) {
                     // Save backup record to database
                     $stmt = $conn->prepare("
-                        INSERT INTO backups (name, type, include_files, include_database, file_path, created_by, created_at) 
-                        VALUES (?, ?, ?, ?, ?, ?, NOW())
+                        INSERT INTO backups (name, type, include_files, include_database, file_path, created_by, created_at, online_backup, cloud_provider) 
+                        VALUES (?, ?, ?, ?, ?, ?, NOW(), ?, ?)
                     ");
-                    $stmt->bind_param("ssiisi", $backup_name, $backup_type, $include_files, $include_database, $backup_path, $_SESSION['user_id']);
+                    $stmt->bind_param("ssiisisi", $backup_name, $backup_type, $include_files, $include_database, $backup_path, $_SESSION['user_id'], $online_backup, $cloud_provider);
                     $stmt->execute();
+                    $backup_id = $stmt->insert_id;
                     $stmt->close();
                     
                     logSystemAction($_SESSION['user_id'], 'backup_created', 'backup_system', $backup_details);
                     $success_message = 'Backup created successfully!';
+                    
+                    // Handle online backup upload if enabled
+                    if ($online_backup && !empty($cloud_provider) && empty($errors)) {
+                        $_SESSION['pending_online_backup'] = [
+                            'backup_id' => $backup_id,
+                            'cloud_provider' => $cloud_provider,
+                            'backup_path' => $backup_path,
+                            'include_database' => $include_database,
+                            'include_files' => $include_files
+                        ];
+                    }
                 }
             }
             
@@ -221,6 +248,127 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_backup'])) {
             error_log("Backup creation error: " . $e->getMessage());
             $errors[] = 'Backup creation failed: ' . $e->getMessage();
         }
+    }
+}
+
+// Handle online backup upload
+if (isset($_SESSION['pending_online_backup']) && !empty($_SESSION['pending_online_backup'])) {
+    $pending_backup = $_SESSION['pending_online_backup'];
+    
+    try {
+        // Update backup status to uploading
+        $stmt = $conn->prepare("UPDATE backups SET cloud_backup_status = 'uploading' WHERE id = ?");
+        $stmt->bind_param("i", $pending_backup['backup_id']);
+        $stmt->execute();
+        $stmt->close();
+        
+        // Initialize cloud API
+        $cloudAPI = new CloudStorageAPI($pending_backup['cloud_provider']);
+        $upload_success = false;
+        $cloud_url = '';
+        $error_message = '';
+        
+        // Upload database file if included
+        if ($pending_backup['include_database']) {
+            $db_file = $pending_backup['backup_path'] . '_database.sql';
+            if (file_exists($db_file)) {
+                $result = $cloudAPI->uploadFile($db_file, basename($db_file));
+                
+                if ($result['success']) {
+                    $upload_success = true;
+                    $cloud_url = $result['url'];
+                    
+                    // Log successful upload
+                    logSystemAction($_SESSION['user_id'], 'database_cloud_upload', 'backup_system', 
+                        "Database uploaded to {$pending_backup['cloud_provider']}: {$result['file_id']}");
+                } elseif (isset($result['auth_required'])) {
+                    // Redirect to OAuth flow
+                    $_SESSION['cloud_oauth_state'] = base64_encode(json_encode([
+                        'backup_id' => $pending_backup['backup_id'],
+                        'cloud_provider' => $pending_backup['cloud_provider'],
+                        'backup_path' => $pending_backup['backup_path'],
+                        'include_database' => $pending_backup['include_database'],
+                        'include_files' => $pending_backup['include_files']
+                    ]));
+                    
+                    header('Location: ' . $result['auth_url']);
+                    exit();
+                } else {
+                    $error_message = 'Database upload failed';
+                }
+            }
+        }
+        
+        // Upload files zip if included
+        if ($pending_backup['include_files'] && $upload_success) {
+            $files_zip = $pending_backup['backup_path'] . '_files.zip';
+            if (file_exists($files_zip)) {
+                $result = $cloudAPI->uploadFile($files_zip, basename($files_zip));
+                
+                if ($result['success']) {
+                    $cloud_url = $result['url']; // Update with files URL or keep database URL
+                    
+                    // Log successful upload
+                    logSystemAction($_SESSION['user_id'], 'files_cloud_upload', 'backup_system', 
+                        "Files uploaded to {$pending_backup['cloud_provider']}: {$result['file_id']}");
+                } else {
+                    $upload_success = false;
+                    $error_message = 'Files upload failed';
+                }
+            }
+        }
+        
+        // Update backup record with cloud backup results
+        if ($upload_success) {
+            $stmt = $conn->prepare("
+                UPDATE backups 
+                SET cloud_backup_status = 'completed', 
+                    cloud_backup_url = ?, 
+                    cloud_backup_at = NOW() 
+                WHERE id = ?
+            ");
+            $stmt->bind_param("si", $cloud_url, $pending_backup['backup_id']);
+            $stmt->execute();
+            $stmt->close();
+            
+            logSystemAction($_SESSION['user_id'], 'online_backup_completed', 'backup_system', 
+                "Online backup completed: {$pending_backup['cloud_provider']}");
+        } else {
+            $stmt = $conn->prepare("
+                UPDATE backups 
+                SET cloud_backup_status = 'failed', 
+                    cloud_backup_error = ? 
+                WHERE id = ?
+            ");
+            $stmt->bind_param("si", $error_message, $pending_backup['backup_id']);
+            $stmt->execute();
+            $stmt->close();
+        }
+        
+    } catch (Exception $e) {
+        error_log("Online backup upload error: " . $e->getMessage());
+        $stmt = $conn->prepare("
+            UPDATE backups 
+            SET cloud_backup_status = 'failed', 
+                cloud_backup_error = ? 
+            WHERE id = ?
+        ");
+        $error_msg = $e->getMessage();
+        $stmt->bind_param("si", $error_msg, $pending_backup['backup_id']);
+        $stmt->execute();
+        $stmt->close();
+    }
+    
+    // Clear pending backup
+    unset($_SESSION['pending_online_backup']);
+}
+
+// Handle OAuth callback state
+if (isset($_SESSION['cloud_oauth_state']) && !empty($_SESSION['cloud_oauth_state'])) {
+    $oauth_state = json_decode(base64_decode($_SESSION['cloud_oauth_state']), true);
+    if ($oauth_state) {
+        $_SESSION['pending_online_backup'] = $oauth_state;
+        unset($_SESSION['cloud_oauth_state']);
     }
 }
 
@@ -439,6 +587,19 @@ try {
             background-color: #191BA9;
             border-color: #191BA9;
         }
+        
+        .online-backup-status {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 12px;
+            font-weight: 500;
+        }
+        
+        .cloud-provider-icon {
+            width: 20px;
+            height: 20px;
+            margin-right: 0.25rem;
+        }
     </style>
 </head>
 <body>
@@ -589,6 +750,25 @@ try {
                                                 <i class="bi bi-folder"></i> Files
                                             </span>
                                         <?php endif; ?>
+                                        <?php if ($backup['online_backup']): ?>
+                                            <span class="badge bg-primary ms-2">
+                                                <i class="bi bi-cloud"></i> <?php echo htmlspecialchars(ucwords(str_replace('_', ' ', $backup['cloud_provider']))); ?>
+                                            </span>
+                                            <?php if (!empty($backup['cloud_backup_status'])): ?>
+                                                <?php
+                                                $status_class = [
+                                                    'pending' => 'secondary',
+                                                    'uploading' => 'warning',
+                                                    'completed' => 'success',
+                                                    'failed' => 'danger'
+                                                ][$backup['cloud_backup_status']] ?? 'secondary';
+                                                ?>
+                                                <span class="badge bg-<?php echo $status_class; ?> ms-2">
+                                                    <i class="bi bi-<?php echo $backup['cloud_backup_status'] === 'completed' ? 'check-circle' : ($backup['cloud_backup_status'] === 'failed' ? 'x-circle' : 'clock'); ?>"></i>
+                                                    <?php echo htmlspecialchars(ucwords($backup['cloud_backup_status'])); ?>
+                                                </span>
+                                            <?php endif; ?>
+                                        <?php endif; ?>
                                     </div>
                                 </div>
                                 <div class="col-md-3">
@@ -617,6 +797,12 @@ try {
                                         <a href="<?php echo htmlspecialchars($backup['file_path'] . '_files.zip'); ?>" 
                                            class="btn btn-sm btn-info me-2" download>
                                             <i class="bi bi-download"></i> Files
+                                        </a>
+                                    <?php endif; ?>
+                                    <?php if ($backup['online_backup'] && !empty($backup['cloud_backup_url']) && $backup['cloud_backup_status'] === 'completed'): ?>
+                                        <a href="<?php echo htmlspecialchars($backup['cloud_backup_url']); ?>" 
+                                           target="_blank" class="btn btn-sm btn-primary me-2" title="View in Cloud">
+                                            <i class="bi bi-cloud"></i> Cloud
                                         </a>
                                     <?php endif; ?>
                                     <button class="btn btn-sm btn-danger" 
@@ -672,6 +858,28 @@ try {
                                 <label class="form-check-label" for="include_files">
                                     <i class="bi bi-folder"></i> System Files
                                 </label>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="online_backup" name="online_backup">
+                                <label class="form-check-label" for="online_backup">
+                                    <i class="bi bi-cloud-upload"></i> Upload to Cloud Storage
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3" id="cloud_provider_section" style="display: none;">
+                            <label for="cloud_provider" class="form-label">Cloud Storage Provider</label>
+                            <select class="form-select" id="cloud_provider" name="cloud_provider">
+                                <option value="">Select Provider</option>
+                                <option value="google_drive">Google Drive</option>
+                                <option value="dropbox">Dropbox</option>
+                                <option value="onedrive">OneDrive</option>
+                            </select>
+                            <div class="form-text">
+                                <i class="bi bi-info-circle"></i> You'll need to configure API credentials for the selected provider.
                             </div>
                         </div>
                         
@@ -781,6 +989,32 @@ try {
                 includeFiles.checked = true;
                 includeDatabase.disabled = false;
                 includeFiles.disabled = false;
+            }
+        });
+        
+        // Handle online backup checkbox
+        document.getElementById('online_backup')?.addEventListener('change', function() {
+            const cloudProviderSection = document.getElementById('cloud_provider_section');
+            const cloudProvider = document.getElementById('cloud_provider');
+            
+            if (this.checked) {
+                cloudProviderSection.style.display = 'block';
+                cloudProvider.setAttribute('required', 'required');
+            } else {
+                cloudProviderSection.style.display = 'none';
+                cloudProvider.removeAttribute('required');
+            }
+        });
+        
+        // Form validation for online backup
+        document.querySelector('#createBackupModal form')?.addEventListener('submit', function(e) {
+            const onlineBackup = document.getElementById('online_backup');
+            const cloudProvider = document.getElementById('cloud_provider');
+            
+            if (onlineBackup.checked && !cloudProvider.value) {
+                e.preventDefault();
+                alert('Please select a cloud storage provider when online backup is enabled.');
+                cloudProvider.focus();
             }
         });
     </script>

@@ -223,6 +223,10 @@ $current_page = basename($_SERVER['PHP_SELF']);
             <i class="bi bi-cloud-download"></i>
             Backup System
         </a>
+        <a href="cloud_config.php" class="sidebar-nav-item <?php echo $current_page == 'cloud_config.php' ? 'active' : ''; ?>">
+            <i class="bi bi-cloud"></i>
+            Cloud Storage
+        </a>
         <a href="logs.php" class="sidebar-nav-item <?php echo $current_page == 'logs.php' ? 'active' : ''; ?>">
             <i class="bi bi-clock-history"></i>
             System Logs

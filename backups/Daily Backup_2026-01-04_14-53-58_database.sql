@@ -8,11 +8,19 @@ CREATE TABLE `backups` (
   `file_path` varchar(255) NOT NULL,
   `created_by` int(11) NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `online_backup` tinyint(1) DEFAULT 0,
+  `cloud_provider` varchar(50) DEFAULT NULL,
+  `cloud_backup_url` varchar(500) DEFAULT NULL,
+  `cloud_backup_status` enum('pending','uploading','completed','failed') DEFAULT NULL,
+  `cloud_backup_error` text DEFAULT NULL,
+  `cloud_backup_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `created_by` (`created_by`),
   CONSTRAINT `backups_ibfk_1` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+INSERT INTO `backups` VALUES("2","Daily Backup","full","1","1","../backups/Daily Backup_2026-01-04_14-38-58","1","2026-01-04 20:38:58","0","","","","","");
+INSERT INTO `backups` VALUES("3","Daily Backup","full","1","1","../backups/Daily Backup_2026-01-04_14-53-26","1","2026-01-04 20:53:26","1","0","","uploading","","");
 
 
 DROP TABLE IF EXISTS `categories`;
@@ -42,6 +50,31 @@ CREATE TABLE `inventory_transactions` (
   CONSTRAINT `inventory_transactions_ibfk_2` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+
+
+DROP TABLE IF EXISTS `online_backup_configs`;
+CREATE TABLE `online_backup_configs` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `provider` varchar(50) NOT NULL,
+  `config_name` varchar(100) NOT NULL,
+  `api_key` text DEFAULT NULL,
+  `api_secret` text DEFAULT NULL,
+  `access_token` text DEFAULT NULL,
+  `refresh_token` text DEFAULT NULL,
+  `bucket_name` varchar(200) DEFAULT NULL,
+  `folder_path` varchar(500) DEFAULT NULL,
+  `is_active` tinyint(1) DEFAULT 1,
+  `created_by` int(11) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `created_by` (`created_by`),
+  CONSTRAINT `online_backup_configs_ibfk_1` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+INSERT INTO `online_backup_configs` VALUES("1","google_drive","Google Drive Backup","","","","","","","0","1","2026-01-04 20:52:31","2026-01-04 20:52:31");
+INSERT INTO `online_backup_configs` VALUES("2","dropbox","Dropbox Backup","","","","","","","0","1","2026-01-04 20:52:31","2026-01-04 20:52:31");
+INSERT INTO `online_backup_configs` VALUES("3","onedrive","OneDrive Backup","","","","","","","0","1","2026-01-04 20:52:31","2026-01-04 20:52:31");
 
 
 DROP TABLE IF EXISTS `permissions`;
@@ -216,12 +249,17 @@ CREATE TABLE `system_logs` (
   KEY `idx_logs_created_at` (`created_at`),
   KEY `idx_logs_user_action` (`user_id`,`action`),
   CONSTRAINT `system_logs_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
-) ENGINE=InnoDB AUTO_INCREMENT=11 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=16 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 INSERT INTO `system_logs` VALUES("7","1","logout","authentication","User logged out: System Administrator (admin@pims.com) with role: system_admin","::1","Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36","2026-01-04 20:07:59");
 INSERT INTO `system_logs` VALUES("8","1","login_success","authentication","User logged in: System Administrator (admin@pims.com) with role: system_admin","::1","Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36","2026-01-04 20:11:06");
 INSERT INTO `system_logs` VALUES("9","1","backup_created","backup_system","Backup: Daily Backup, Type: full, Files: Yes, Database: Yes","::1","Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36","2026-01-04 20:29:34");
 INSERT INTO `system_logs` VALUES("10","1","backup_created","backup_system","Backup: Daily Backup, Type: full, Files: Yes, Database: Yes","::1","Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36","2026-01-04 20:29:48");
+INSERT INTO `system_logs` VALUES("11","1","backup_created","backup_system","Backup: Daily Backup, Type: full, Files: Yes, Database: Yes","::1","Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36","2026-01-04 20:31:16");
+INSERT INTO `system_logs` VALUES("12","1","backup_created","backup_system","Backup: Daily Backup, Type: full, Files: Yes, Database: Yes","::1","Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36","2026-01-04 20:38:58");
+INSERT INTO `system_logs` VALUES("13","1","backup_deleted","backup_system","Deleted backup: Daily Backup","::1","Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36","2026-01-04 20:39:04");
+INSERT INTO `system_logs` VALUES("14","1","online_backup_created","online_backup","Backup: Daily Backup, Storage: local","::1","Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36","2026-01-04 20:41:36");
+INSERT INTO `system_logs` VALUES("15","1","backup_created","backup_system","Backup: Daily Backup, Type: full, Files: Yes, Database: Yes, Online: Yes (google_drive)","::1","Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36","2026-01-04 20:53:26");
 
 
 DROP TABLE IF EXISTS `users`;
