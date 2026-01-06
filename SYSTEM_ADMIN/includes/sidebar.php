@@ -220,6 +220,10 @@ try {
             <i class="bi bi-tags"></i>
             Categories
         </a>
+        <a href="offices.php" class="sidebar-nav-item <?php echo $current_page == 'offices.php' ? 'active' : ''; ?>">
+            <i class="bi bi-building"></i>
+            Offices
+        </a>
         <a href="system_settings.php" class="sidebar-nav-item <?php echo $current_page == 'system_settings.php' ? 'active' : ''; ?>">
             <i class="bi bi-gear"></i>
             System Settings
