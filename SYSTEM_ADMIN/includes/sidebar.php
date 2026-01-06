@@ -224,6 +224,10 @@ try {
             <i class="bi bi-building"></i>
             Offices
         </a>
+        <a href="forms.php" class="sidebar-nav-item <?php echo $current_page == 'forms.php' ? 'active' : ''; ?>">
+            <i class="bi bi-file-earmark-text"></i>
+            Forms
+        </a>
         <a href="system_settings.php" class="sidebar-nav-item <?php echo $current_page == 'system_settings.php' ? 'active' : ''; ?>">
             <i class="bi bi-gear"></i>
             System Settings
