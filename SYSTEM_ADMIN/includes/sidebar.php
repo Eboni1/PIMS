@@ -216,21 +216,9 @@ try {
             <i class="bi bi-people"></i>
             User Management
         </a>
-        <a href="#" class="sidebar-nav-item">
-            <i class="bi bi-box"></i>
-            Inventory Management
-        </a>
-        <a href="#" class="sidebar-nav-item">
+        <a href="categories.php" class="sidebar-nav-item <?php echo $current_page == 'categories.php' ? 'active' : ''; ?>">
             <i class="bi bi-tags"></i>
             Categories
-        </a>
-        <a href="#" class="sidebar-nav-item">
-            <i class="bi bi-arrow-left-right"></i>
-            Transactions
-        </a>
-        <a href="#" class="sidebar-nav-item">
-            <i class="bi bi-file-text"></i>
-            Reports
         </a>
         <a href="system_settings.php" class="sidebar-nav-item <?php echo $current_page == 'system_settings.php' ? 'active' : ''; ?>">
             <i class="bi bi-gear"></i>
