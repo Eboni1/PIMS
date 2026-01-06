@@ -14,35 +14,73 @@ if ($_SESSION['role'] !== 'system_admin' && $_SESSION['role'] !== 'admin') {
 
 require_once '../config.php';
 
+// Check if system_logs table exists
+$table_check = $conn->query("SHOW TABLES LIKE 'system_logs'");
+if ($table_check->num_rows === 0) {
+    // Create system_logs table if it doesn't exist
+    $create_table_sql = "
+        CREATE TABLE IF NOT EXISTS `system_logs` (
+            `id` int(11) NOT NULL AUTO_INCREMENT,
+            `user_id` int(11) DEFAULT NULL,
+            `action` varchar(100) NOT NULL,
+            `module` varchar(50) NOT NULL,
+            `description` text DEFAULT NULL,
+            `ip_address` varchar(45) DEFAULT NULL,
+            `user_agent` text DEFAULT NULL,
+            `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+            PRIMARY KEY (`id`),
+            KEY `idx_user_id` (`user_id`),
+            KEY `idx_action` (`action`),
+            KEY `idx_module` (`module`),
+            KEY `idx_created_at` (`created_at`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+    ";
+    
+    if ($conn->query($create_table_sql)) {
+        $table_created = true;
+    } else {
+        $table_error = "Failed to create system_logs table: " . $conn->error;
+    }
+}
+
 // Handle clear logs action
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['clear_logs'])) {
     $range = $_POST['range'] ?? 'all';
     $clear_message = '';
     
-    try {
-        // Build WHERE clause based on range
-        $where_conditions = [];
-        $params = [];
-        $types = '';
-        
-        switch ($range) {
-            case 'all':
-                try {
-                    // Use DELETE instead of TRUNCATE for clearing all logs
-                    $conn->query("DELETE FROM system_logs");
-                    $clear_message = "Successfully cleared all system logs.";
-                } catch (Exception $delete_error) {
-                    $clear_message = "Failed to clear logs";
-                }
-                break;
+    // Check if table exists before attempting operations
+    $table_check = $conn->query("SHOW TABLES LIKE 'system_logs'");
+    if ($table_check->num_rows === 0) {
+        $clear_message = "Error: system_logs table does not exist. Please run database setup first.";
+    } else {
+        try {
+            // Build WHERE clause based on range
+            $where_conditions = [];
+            $params = [];
+            $types = '';
+            
+            switch ($range) {
+                case 'all':
+                    try {
+                        // Use DELETE instead of TRUNCATE for clearing all logs
+                        $result = $conn->query("DELETE FROM system_logs");
+                        if ($result) {
+                            $clear_message = "Successfully cleared all system logs.";
+                        } else {
+                            $clear_message = "Failed to clear logs: " . $conn->error;
+                        }
+                    } catch (Exception $delete_error) {
+                        $clear_message = "Failed to clear logs: " . $delete_error->getMessage();
+                    }
+                    break;
             case 'older_than_30':
-                $where_conditions[] = "created_at < DATE_SUB(NOW(), INTERVAL 30 DAY)";
+                $where_conditions[] = "timestamp < DATE_SUB(NOW(), INTERVAL 30 DAY)";
                 break;
             case 'older_than_90':
-                $where_conditions[] = "created_at < DATE_SUB(NOW(), INTERVAL 90 DAY)";
+                $where_conditions[] = "timestamp < DATE_SUB(NOW(), INTERVAL 90 DAY)";
                 break;
             case 'older_than_365':
-                $where_conditions[] = "created_at < DATE_SUB(NOW(), INTERVAL 365 DAY)";
+                $where_conditions[] = "timestamp < DATE_SUB(NOW(), INTERVAL 365 DAY)";
                 break;
             default:
                 $clear_message = 'Invalid clear range';
@@ -79,6 +117,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['clear_logs'])) {
         header('Location: logs.php?message=' . urlencode('Database error occurred'));
         exit();
     }
+    }
 }
 
 // Function to log system actions
@@ -90,7 +129,7 @@ function logSystemAction($user_id, $action, $module, $details = null) {
         $user_agent = $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown';
         
         $stmt = $conn->prepare("
-            INSERT INTO system_logs (user_id, action, module, details, ip_address, user_agent) 
+            INSERT INTO system_logs (user_id, action, module, description, ip_address, user_agent) 
             VALUES (?, ?, ?, ?, ?, ?)
         ");
         $stmt->bind_param("isssss", $user_id, $action, $module, $details, $ip_address, $user_agent);
@@ -114,7 +153,7 @@ try {
         SELECT sl.*, u.first_name, u.last_name, u.username 
         FROM system_logs sl 
         LEFT JOIN users u ON sl.user_id = u.id 
-        ORDER BY sl.created_at DESC
+        ORDER BY sl.timestamp DESC
     ";
     
     $stmt = $conn->prepare($sql);
@@ -393,7 +432,7 @@ $page_title = 'System Logs';
                                                     </td>
                                                     <td>
                                                         <small class="text-muted">
-                                                            <?php echo date('M j, Y H:i:s', strtotime($log['created_at'])); ?>
+                                                            <?php echo date('M j, Y H:i:s', strtotime($log['timestamp'])); ?>
                                                         </small>
                                                     </td>
                                                     <td>
@@ -636,7 +675,7 @@ $page_title = 'System Logs';
                                         <tr><td><strong>ID:</strong></td><td>${log.id}</td></tr>
                                         <tr><td><strong>Action:</strong></td><td><span class="badge bg-${getBadgeColor(logClass)}">${log.action}</span></td></tr>
                                         <tr><td><strong>Module:</strong></td><td><span class="badge bg-secondary">${log.module}</span></td></tr>
-                                        <tr><td><strong>Date/Time:</strong></td><td>${formatDateTime(log.created_at)}</td></tr>
+                                        <tr><td><strong>Date/Time:</strong></td><td>${formatDateTime(log.timestamp)}</td></tr>
                                     </table>
                                 </div>
                                 <div class="col-md-6">

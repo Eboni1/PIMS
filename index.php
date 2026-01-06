@@ -1,40 +1,25 @@
 <?php
 session_start();
 require_once 'config.php';
+require_once 'includes/logger.php';
 
-// Import the logging function
-function logSystemAction($user_id, $action, $module, $details = null) {
-    global $conn;
-    
-    try {
-        $ip_address = $_SERVER['REMOTE_ADDR'] ?? 'Unknown';
-        $user_agent = $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown';
-        
-        $stmt = $conn->prepare("
-            INSERT INTO system_logs (user_id, action, module, details, ip_address, user_agent) 
-            VALUES (?, ?, ?, ?, ?, ?)
-        ");
-        $stmt->bind_param("isssss", $user_id, $action, $module, $details, $ip_address, $user_agent);
-        $stmt->execute();
-        $stmt->close();
-        
-        return true;
-    } catch (Exception $e) {
-        error_log("Failed to log system action: " . $e->getMessage());
-        return false;
+// Get system settings for logo and theme
+$system_settings = [];
+try {
+    $stmt = $conn->prepare("SELECT setting_name, setting_value FROM system_settings");
+    $stmt->execute();
+    $result = $stmt->get_result();
+    while ($row = $result->fetch_assoc()) {
+        $system_settings[$row['setting_name']] = $row['setting_value'];
     }
+    $stmt->close();
+} catch (Exception $e) {
+    // Fallback to default if database fails
+    $system_settings['system_logo'] = '';
+    $system_settings['system_name'] = 'PIMS';
+    $system_settings['primary_color'] = '#191BA9';
+    $system_settings['secondary_color'] = '#5CC2F2';
 }
-
-// Generate CSRF token
-if (!isset($_SESSION['csrf_token'])) {
-    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-}
-
-// Security headers
-header('X-Content-Type-Options: nosniff');
-header('X-Frame-Options: DENY');
-header('X-XSS-Protection: 1; mode=block');
-header('Strict-Transport-Security: max-age=31536000; includeSubDomains');
 
 // Rate limiting - prevent brute force attacks
 if (!isset($_SESSION['login_attempts'])) {
@@ -42,11 +27,11 @@ if (!isset($_SESSION['login_attempts'])) {
     $_SESSION['last_attempt_time'] = time();
 }
 
-// Lockout after 5 failed attempts for 15 minutes
+// Lockout after 5 failed attempts for 30 minutes
 if ($_SESSION['login_attempts'] >= 5) {
     $time_diff = time() - $_SESSION['last_attempt_time'];
-    if ($time_diff < 900) { // 15 minutes
-        $error = "Account locked. Please try again in " . ceil((900 - $time_diff) / 60) . " minutes.";
+    if ($time_diff < 1800) { // 30 minutes
+        $error = "Account locked. Please try again in " . ceil((1800 - $time_diff) / 60) . " minutes.";
     } else {
         $_SESSION['login_attempts'] = 0;
         $_SESSION['last_attempt_time'] = time();
@@ -207,7 +192,7 @@ if (!isset($_SESSION['csrf_token'])) {
         
         .carousel-section {
             flex: 1;
-            background: linear-gradient(135deg, #191BA9 0%, #5CC2F2 100%);
+            background: linear-gradient(135deg, <?php echo htmlspecialchars($system_settings['primary_color'] ?? '#191BA9'); ?> 0%, <?php echo htmlspecialchars($system_settings['secondary_color'] ?? '#5CC2F2'); ?> 100%);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -285,7 +270,7 @@ if (!isset($_SESSION['csrf_token'])) {
                                 <div class="display-1 mb-3">
                                     <i class="bi bi-box-seam"></i>
                                 </div>
-                                <h3 class="carousel-title">PIMS</h3>
+                                <h3 class="carousel-title"><?php echo htmlspecialchars($system_settings['system_name'] ?? 'PIMS'); ?></h3>
                                 <p class="lead">
                                     Pilar Inventory Management System - Streamline your inventory operations with our comprehensive management solution.
                                 </p>
@@ -337,10 +322,14 @@ if (!isset($_SESSION['csrf_token'])) {
                         <div class="card-header bg-primary text-white text-center rounded-top-4">
                             <div class="mb-3">
                                 <div class="logo-circle">
-                                    <img src="img/trans_logo.png" alt="PIMS Logo" class="img-fluid" style="max-height: 60px; border-radius: 8px;">
+                                    <?php 
+                                    $logo_path = !empty($system_settings['system_logo']) ? 'img/trans_logo.png' : htmlspecialchars($system_settings['system_logo']);
+                                    $system_name = htmlspecialchars($system_settings['system_name'] ?? 'PIMS');
+                                    ?>
+                                    <img src="<?php echo $logo_path; ?>" alt="<?php echo $system_name; ?> Logo" class="img-fluid" style="max-height: 60px; border-radius: 8px;">
                                 </div>
                             </div>
-                            <h6 class="mb-0">PILAR INVENTORY MANAGEMENT SYSTEM</h6>
+                            <h6 class="mb-0"><?php echo $system_name; ?> INVENTORY MANAGEMENT SYSTEM</h6>
                         </div>
                         <div class="card-body">
                             <?php if (isset($error)): ?>

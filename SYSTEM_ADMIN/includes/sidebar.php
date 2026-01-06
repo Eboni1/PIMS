@@ -1,6 +1,23 @@
 <?php
 // Get current page name for active state
 $current_page = basename($_SERVER['PHP_SELF']);
+
+// Get system settings for logo
+require_once '../config.php';
+$system_settings = [];
+try {
+    $stmt = $conn->prepare("SELECT setting_name, setting_value FROM system_settings");
+    $stmt->execute();
+    $result = $stmt->get_result();
+    while ($row = $result->fetch_assoc()) {
+        $system_settings[$row['setting_name']] = $row['setting_value'];
+    }
+    $stmt->close();
+} catch (Exception $e) {
+    // Fallback to default if database fails
+    $system_settings['system_logo'] = '';
+    $system_settings['system_name'] = 'PIMS';
+}
 ?>
 <style>
 /* Sidebar Styles */
@@ -177,10 +194,14 @@ $current_page = basename($_SERVER['PHP_SELF']);
     <div class="sidebar-header">
         <div class="d-flex align-items-center">
             <div class="sidebar-logo">
-                <img src="../img/trans_logo.png" alt="PIMS Logo" class="img-fluid" style="max-height: 40px; border-radius: 8px;">
+                <?php 
+                $logo_path = !empty($system_settings['system_logo']) ? '../img/trans_logo.png' : '../' . htmlspecialchars($system_settings['system_logo']);
+                $system_name = htmlspecialchars($system_settings['system_name'] ?? 'PIMS');
+                ?>
+                <img src="<?php echo $logo_path; ?>" alt="<?php echo $system_name; ?> Logo" class="img-fluid" style="max-height: 40px; border-radius: 8px;">
             </div>
             <div class="sidebar-title">
-                <h6 class="mb-0 text-white">PIMS</h6>
+                <h6 class="mb-0 text-white"><?php echo $system_name; ?></h6>
                 <small class="text-white-50">Inventory System</small>
             </div>
         </div>
@@ -211,7 +232,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
             <i class="bi bi-file-text"></i>
             Reports
         </a>
-        <a href="#" class="sidebar-nav-item">
+        <a href="system_settings.php" class="sidebar-nav-item <?php echo $current_page == 'system_settings.php' ? 'active' : ''; ?>">
             <i class="bi bi-gear"></i>
             System Settings
         </a>

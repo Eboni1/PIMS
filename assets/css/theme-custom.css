@@ -1,0 +1,49 @@
+
+:root {
+    --primary-color: #191ba9;
+    --secondary-color: #5cc2f2;
+    --accent-color: #ff6b6b;
+    --primary-hover: #050795;
+    --secondary-hover: #48aede;
+}
+
+.bg-primary-custom { background-color: var(--primary-color) !important; }
+.bg-secondary-custom { background-color: var(--secondary-color) !important; }
+.bg-accent-custom { background-color: var(--accent-color) !important; }
+
+.text-primary-custom { color: var(--primary-color) !important; }
+.text-secondary-custom { color: var(--secondary-color) !important; }
+.text-accent-custom { color: var(--accent-color) !important; }
+
+.btn-primary-custom { 
+    background-color: var(--primary-color) !important; 
+    border-color: var(--primary-color) !important;
+    color: white !important;
+}
+.btn-primary-custom:hover { 
+    background-color: var(--primary-hover) !important; 
+    border-color: var(--primary-hover) !important;
+}
+
+.btn-secondary-custom { 
+    background-color: var(--secondary-color) !important; 
+    border-color: var(--secondary-color) !important;
+    color: white !important;
+}
+.btn-secondary-custom:hover { 
+    background-color: var(--secondary-hover) !important; 
+    border-color: var(--secondary-hover) !important;
+}
+
+.card-header-custom { 
+    background-color: var(--primary-color) !important; 
+    color: white !important;
+}
+
+.sidebar-custom { 
+    background-color: var(--primary-color) !important;
+}
+
+.sidebar-custom .nav-link:hover {
+    background-color: var(--primary-hover) !important;
+}

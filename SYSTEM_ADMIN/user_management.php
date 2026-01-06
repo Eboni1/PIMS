@@ -13,6 +13,7 @@ if ($_SESSION['role'] !== 'system_admin') {
 }
 
 require_once '../config.php';
+require_once '../includes/logger.php';
 
 // Import PHPMailer classes
 use PHPMailer\PHPMailer\PHPMailer;
@@ -24,28 +25,8 @@ require_once 'PHPMailer/PHPMailer-7.0.0/src/Exception.php';
 require_once 'PHPMailer/PHPMailer-7.0.0/src/PHPMailer.php';
 require_once 'PHPMailer/PHPMailer-7.0.0/src/SMTP.php';
 
-// Function to log system actions
-function logSystemAction($user_id, $action, $module, $details = null) {
-    global $conn;
-    
-    try {
-        $ip_address = $_SERVER['REMOTE_ADDR'] ?? 'Unknown';
-        $user_agent = $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown';
-        
-        $stmt = $conn->prepare("
-            INSERT INTO system_logs (user_id, action, module, details, ip_address, user_agent) 
-            VALUES (?, ?, ?, ?, ?, ?)
-        ");
-        $stmt->bind_param("isssss", $user_id, $action, $module, $details, $ip_address, $user_agent);
-        $stmt->execute();
-        $stmt->close();
-        
-        return true;
-    } catch (Exception $e) {
-        error_log("Failed to log system action: " . $e->getMessage());
-        return false;
-    }
-}
+// Log user management page access
+logSystemAction($_SESSION['user_id'], 'access', 'user_management', 'System admin accessed user management page');
 
 // Handle form submissions
 $message = '';

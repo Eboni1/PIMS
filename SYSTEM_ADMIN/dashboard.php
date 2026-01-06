@@ -13,6 +13,10 @@ if ($_SESSION['role'] !== 'system_admin') {
 }
 
 require_once '../config.php';
+require_once '../includes/logger.php';
+
+// Log dashboard access
+logSystemAction($_SESSION['user_id'], 'access', 'dashboard', 'System admin accessed dashboard');
 
 // Get system statistics
 $stats = [];

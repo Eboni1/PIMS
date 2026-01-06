@@ -1,29 +1,7 @@
 <?php
 session_start();
 require_once 'config.php';
-
-// Import the logging function
-function logSystemAction($user_id, $action, $module, $details = null) {
-    global $conn;
-    
-    try {
-        $ip_address = $_SERVER['REMOTE_ADDR'] ?? 'Unknown';
-        $user_agent = $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown';
-        
-        $stmt = $conn->prepare("
-            INSERT INTO system_logs (user_id, action, module, details, ip_address, user_agent) 
-            VALUES (?, ?, ?, ?, ?, ?)
-        ");
-        $stmt->bind_param("isssss", $user_id, $action, $module, $details, $ip_address, $user_agent);
-        $stmt->execute();
-        $stmt->close();
-        
-        return true;
-    } catch (Exception $e) {
-        error_log("Failed to log system action: " . $e->getMessage());
-        return false;
-    }
-}
+require_once 'includes/logger.php';
 
 // Log logout if user is logged in
 if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true) {
