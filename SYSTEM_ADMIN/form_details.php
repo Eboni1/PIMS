@@ -349,6 +349,8 @@ if ($form['form_code'] === 'PAR') {
                 <?php include 'forms/ris_form.php'; ?>
             <?php elseif ($form['form_code'] === 'ITR'): ?>
                 <?php include 'forms/itr_form.php'; ?>
+            <?php elseif ($form['form_code'] === 'IIRUP'): ?>
+                <?php include 'forms/iirup_form.php'; ?>
             <?php endif; ?>
         </div>
     </div>
