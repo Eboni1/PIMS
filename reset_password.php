@@ -7,9 +7,33 @@ $success = '';
 $token = $_GET['token'] ?? '';
 $email = $_GET['email'] ?? '';
 
-// Validate token and email (in production, you'd check against database)
+// Validate token and email from database
 if (!$token || !$email) {
     $error = "Invalid reset link. Please request a new password reset.";
+} else {
+    // Check if token exists and is valid
+    $stmt = $conn->prepare("SELECT id, email, token, expires_at, is_used FROM password_resets WHERE email = ? AND token = ? AND is_used = FALSE ORDER BY created_at DESC LIMIT 1");
+    $stmt->bind_param("ss", $email, $token);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    if ($result->num_rows === 0) {
+        $error = "Invalid or expired reset link. Please request a new password reset.";
+    } else {
+        $reset_data = $result->fetch_assoc();
+        
+        // Check if token has expired
+        if (strtotime($reset_data['expires_at']) < time()) {
+            $error = "Reset link has expired. Please request a new password reset.";
+            
+            // Mark expired token as used
+            $update_stmt = $conn->prepare("UPDATE password_resets SET is_used = TRUE WHERE id = ?");
+            $update_stmt->bind_param("i", $reset_data['id']);
+            $update_stmt->execute();
+            $update_stmt->close();
+        }
+    }
+    $stmt->close();
 }
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && !$error) {
@@ -24,26 +48,44 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && !$error) {
     } elseif ($password !== $confirm_password) {
         $error = "Passwords do not match.";
     } else {
-        // In production, you'd verify the token and update the password
-        // For demo purposes, we'll just show success
-        
         // Hash the new password
         $password_hash = password_hash($password, PASSWORD_DEFAULT);
         
-        // Update user password (this is a simplified version)
-        $stmt = $conn->prepare("UPDATE users SET password_hash = ? WHERE email = ?");
-        $stmt->bind_param("ss", $password_hash, $email);
+        // Start transaction
+        $conn->begin_transaction();
         
-        if ($stmt->execute()) {
+        try {
+            // Update user password
+            $update_user_stmt = $conn->prepare("UPDATE users SET password_hash = ? WHERE email = ?");
+            $update_user_stmt->bind_param("ss", $password_hash, $email);
+            $update_user_stmt->execute();
+            
+            // Mark the reset token as used
+            $mark_used_stmt = $conn->prepare("UPDATE password_resets SET is_used = TRUE WHERE email = ? AND token = ?");
+            $mark_used_stmt->bind_param("ss", $email, $token);
+            $mark_used_stmt->execute();
+            
+            // Commit transaction
+            $conn->commit();
+            
             $success = "Password has been reset successfully. You can now login with your new password.";
+            
+            // Log successful password reset
+            error_log("Password reset successfully for email: " . $email . " from IP: " . $_SERVER['REMOTE_ADDR']);
             
             // Clear the form
             $_POST = array();
-        } else {
+            
+        } catch (Exception $e) {
+            // Rollback transaction on error
+            $conn->rollback();
             $error = "Failed to reset password. Please try again.";
+            
+            error_log("Password reset error for email " . $email . ": " . $e->getMessage());
         }
         
-        $stmt->close();
+        if (isset($update_user_stmt)) $update_user_stmt->close();
+        if (isset($mark_used_stmt)) $mark_used_stmt->close();
     }
 }
 ?>

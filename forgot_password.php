@@ -2,6 +2,19 @@
 session_start();
 require_once 'config.php';
 
+// Site Settings (same as user_management.php)
+define('SITE_URL', 'http://localhost/PIMS');
+define('SITE_NAME', 'PIMS');
+// Import PHPMailer classes
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\SMTP;
+use PHPMailer\PHPMailer\Exception;
+
+// Require PHPMailer autoloader
+require_once 'SYSTEM_ADMIN/PHPMailer/PHPMailer-7.0.0/src/Exception.php';
+require_once 'SYSTEM_ADMIN/PHPMailer/PHPMailer-7.0.0/src/PHPMailer.php';
+require_once 'SYSTEM_ADMIN/PHPMailer/PHPMailer-7.0.0/src/SMTP.php';
+
 // Security headers
 header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: DENY');
@@ -67,18 +80,132 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         $token = bin2hex(random_bytes(32));
                         $expiry = date('Y-m-d H:i:s', strtotime('+1 hour'));
                         
-                        // In production, save token to password_resets table
-                        // For demo purposes, we'll just show a success message
-                        $success = "Password reset link has been sent to your email. (Demo mode - check console for token)";
+                        // Clear any existing tokens for this email
+                        $delete_stmt = $conn->prepare("DELETE FROM password_resets WHERE email = ?");
+                        $delete_stmt->bind_param("s", $email);
+                        $delete_stmt->execute();
+                        $delete_stmt->close();
                         
-                        // In production, you would send an email with the reset link
-                        $reset_link = "http://localhost/PIMS/reset_password.php?token=" . $token . "&email=" . urlencode($email);
+                        // Save token to database
+                        $insert_stmt = $conn->prepare("INSERT INTO password_resets (email, token, expires_at) VALUES (?, ?, ?)");
+                        $insert_stmt->bind_param("sss", $email, $token, $expiry);
                         
-                        // For demo purposes, show the link (remove this in production)
-                        error_log("Reset Link: " . $reset_link);
+                        if ($insert_stmt->execute()) {
+                            // Generate reset link
+                            $reset_link = SITE_URL . "/reset_password.php?token=" . $token . "&email=" . urlencode($email);
+                            
+                            // Send email using PHPMailer (same method as user_management.php)
+                            try {
+                                $mail = new PHPMailer(true);
+                                
+                                // Server settings
+                                $mail->SMTPDebug = 0;                      // Disable verbose debug output
+                                $mail->isSMTP();                           // Send using SMTP
+                                $mail->Host       = 'smtp.gmail.com';      // Set the SMTP server to send through
+                                $mail->SMTPAuth   = true;                  // Enable SMTP authentication
+                                $mail->Username   = 'waltielappy@gmail.com'; // SMTP username
+                                $mail->Password   = 'swmd zjes fubb ffxt';    // SMTP password
+                                $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS; // Enable implicit TLS encryption
+                                $mail->Port       = 465;                   // TCP port to connect to
+                                
+                                // Recipients
+                                $mail->setFrom('waltielappy@gmail.com', 'PIMS System Admin');
+                                $mail->addAddress($email, $user['username']);
+                                
+                                // Content
+                                $mail->isHTML(true);  // Set email format to HTML
+                                $mail->Subject = "Password Reset Request - PIMS";
+                                
+                                $mail->Body = "
+                                <html>
+                                <head>
+                                    <style>
+                                        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                                        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                                        .header { background: linear-gradient(135deg, #191BA9 0%, #5CC2F2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+                                        .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+                                        .button { display: inline-block; background: #191BA9; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }
+                                        .footer { text-align: center; margin-top: 30px; color: #666; font-size: 12px; }
+                                        .security-note { background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 5px; margin: 20px 0; }
+                                    </style>
+                                </head>
+                                <body>
+                                    <div class='container'>
+                                        <div class='header'>
+                                            <h1>🔐 Password Reset Request</h1>
+                                            <p>PIMS - Property Inventory Management System</p>
+                                        </div>
+                                        <div class='content'>
+                                            <p>Hello <strong>" . htmlspecialchars($user['username']) . "</strong>,</p>
+                                            <p>We received a request to reset your password for your PIMS account.</p>
+                                            
+                                            <div class='security-note'>
+                                                <strong>🔒 Security Notice:</strong> This password reset link will expire in 1 hour for your security. If you didn't request this reset, please ignore this email.
+                                            </div>
+                                            
+                                            <p style='text-align: center;'>
+                                                <a href='$reset_link' class='button'>Reset My Password</a>
+                                            </p>
+                                            
+                                            <p>Or copy and paste this link into your browser:</p>
+                                            <p style='background: #f0f0f0; padding: 10px; border-radius: 5px; word-break: break-all;'>
+                                                $reset_link
+                                            </p>
+                                            
+                                            <p><strong>Important:</strong></p>
+                                            <ul>
+                                                <li>This link expires after 1 hour</li>
+                                                <li>If you didn't request this reset, please contact your administrator</li>
+                                                <li>Never share this link with anyone</li>
+                                            </ul>
+                                        </div>
+                                        <div class='footer'>
+                                            <p>This is an automated message from PIMS. Please do not reply to this email.</p>
+                                            <p>&copy; " . date('Y') . " PIMS. All rights reserved.</p>
+                                        </div>
+                                    </div>
+                                </body>
+                                </html>";
+                                
+                                $mail->AltBody = "
+                                Password Reset Request - PIMS
+                                
+                                Hello " . $user['username'] . ",
+                                
+                                We received a request to reset your password for your PIMS account.
+                                
+                                Click this link to reset your password: $reset_link
+                                
+                                Important:
+                                - This link expires after 1 hour
+                                - If you didn't request this reset, please contact your administrator
+                                - Never share this link with anyone
+                                
+                                This is an automated message. Please do not reply.
+                                ";
+                                
+                                $mail->send();
+                                $success = "Password reset link has been sent to your email address. Please check your inbox (and spam folder).";
+                                
+                                // Log successful password reset request
+                                error_log("Password reset email sent to user ID: " . $user['id'] . " from IP: " . $_SERVER['REMOTE_ADDR']);
+                                
+                            } catch (Exception $e) {
+                                $error = "Failed to send reset email. Please try again later.";
+                                $_SESSION['reset_attempts']++;
+                                $_SESSION['last_reset_attempt'] = time();
+                                
+                                error_log("Failed to send password reset email to user ID: " . $user['id'] . ": " . $mail->ErrorInfo);
+                            }
+                        } else {
+                            $error = "Database error. Please try again later.";
+                            $_SESSION['reset_attempts']++;
+                            $_SESSION['last_reset_attempt'] = time();
+                            
+                            error_log("Failed to save password reset token for user ID: " . $user['id']);
+                        }
                         
-                        // Log password reset request
-                        error_log("Password reset requested for user ID: " . $user['id'] . " from IP: " . $_SERVER['REMOTE_ADDR']);
+                        $insert_stmt->close();
                         
                         // Reset attempts on successful request
                         $_SESSION['reset_attempts'] = 0;
