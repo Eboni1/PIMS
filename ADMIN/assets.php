@@ -49,6 +49,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['a
     }
     $category_stmt->close();
     
+    // Check if asset with same description already exists
+    $existing_asset = null;
+    $check_stmt = $conn->prepare("SELECT id, quantity, unit_cost FROM assets WHERE description = ? AND asset_categories_id = ? AND office_id = ?");
+    $check_stmt->bind_param("sii", $description, $asset_categories_id, $office_id);
+    $check_stmt->execute();
+    $check_result = $check_stmt->get_result();
+    if ($check_result->num_rows > 0) {
+        $existing_asset = $check_result->fetch_assoc();
+    }
+    $check_stmt->close();
+    
     // Validation
     if (empty($description)) {
         $message = "Asset description is required.";
@@ -67,226 +78,124 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['a
         $message_type = "danger";
     } else {
         try {
-            // Start transaction
-            $conn->begin_transaction();
-            
-            // Insert main asset
-            $stmt = $conn->prepare("INSERT INTO assets (asset_categories_id, description, quantity, unit_cost, office_id) VALUES (?, ?, ?, ?, ?)");
-            $stmt->bind_param("isidi", $asset_categories_id, $description, $quantity, $unit_cost, $office_id);
-            $stmt->execute();
-            $asset_id = $conn->insert_id;
-            
-            // Handle specific asset data
-            if (!empty($category_code)) {
-                $specific_data = [];
-                $fields = $assetManager->getCategoryFormFields($category_code);
-                
-                foreach ($fields as $field_name => $field_config) {
-                    if ($field_config['type'] === 'checkbox') {
-                        $specific_data[$field_name] = isset($_POST[$field_name]) ? 1 : 0;
-                    } else {
-                        $specific_data[$field_name] = $_POST[$field_name] ?? '';
+            if ($existing_asset) {
+                // Update existing asset quantity
+                $new_quantity = $existing_asset['quantity'] + $quantity;
+                $update_stmt = $conn->prepare("UPDATE assets SET quantity = ?, unit_cost = ? WHERE id = ?");
+                $update_stmt->bind_param("idi", $new_quantity, $unit_cost, $existing_asset['id']);
+                if ($update_stmt->execute()) {
+                    $asset_id = $existing_asset['id'];
+                    
+                    // Create additional asset items for new quantity
+                    for ($i = 1; $i <= $quantity; $i++) {
+                        $item_description = $description . ' - Item ' . ($existing_asset['quantity'] + $i);
+                        $item_stmt = $conn->prepare("INSERT INTO asset_items (asset_id, description, quantity, status, value, acquisition_date, office_id) VALUES (?, ?, ?, ?, ?, ?, ?)");
+                        $item_status = 'available';
+                        $item_quantity = 1;
+                        $acquisition_date = date('Y-m-d');
+                        $item_stmt->bind_param("isisdss", $asset_id, $item_description, $item_quantity, $item_status, $unit_cost, $acquisition_date, $office_id);
+                        $item_stmt->execute();
                     }
+                    
+                    $message = "Asset quantity updated successfully! Added {$quantity} more items to existing asset.";
+                    $message_type = "success";
+                    logSystemAction($_SESSION['user_id'], 'asset_quantity_updated', 'asset_management', "Updated quantity for existing asset: {$description}");
+                } else {
+                    throw new Exception("Failed to update asset: " . $update_stmt->error);
                 }
+            } else {
+                // Insert new asset
+                $stmt = $conn->prepare("INSERT INTO assets (asset_categories_id, description, quantity, unit_cost, office_id) VALUES (?, ?, ?, ?, ?)");
+                $stmt->bind_param("isidi", $asset_categories_id, $description, $quantity, $unit_cost, $office_id);
                 
-                // Remove empty values to avoid database issues
-                $specific_data = array_filter($specific_data, function($value) {
-                    return $value !== '' && $value !== null;
-                });
-                
-                if (!empty($specific_data)) {
-                    $assetManager->saveSpecificAssetData($asset_id, $category_code, $specific_data, $_SESSION['user_id']);
+                if ($stmt->execute()) {
+                    $asset_id = $conn->insert_id;
+                    
+                    // Handle specific asset data
+                    if (!empty($category_code)) {
+                        $specific_data = [];
+                        $fields = $assetManager->getCategoryFormFields($category_code);
+                        
+                        foreach ($fields as $field_name => $field_config) {
+                            if ($field_config['type'] === 'checkbox') {
+                                $specific_data[$field_name] = isset($_POST[$field_name]) ? 1 : 0;
+                            } else {
+                                $specific_data[$field_name] = $_POST[$field_name] ?? '';
+                            }
+                        }
+                        
+                        // Remove empty values to avoid database issues
+                        $specific_data = array_filter($specific_data, function($value) {
+                            return $value !== '' && $value !== null;
+                        });
+                        
+                        if (!empty($specific_data)) {
+                            $assetManager->saveSpecificAssetData($asset_id, $category_code, $specific_data, $_SESSION['user_id']);
+                        }
+                    }
+                    
+                    // Create individual asset items for each unit
+                    for ($i = 1; $i <= $quantity; $i++) {
+                        $item_description = $description . ' - Item ' . $i;
+                        $item_stmt = $conn->prepare("INSERT INTO asset_items (asset_id, description, quantity, status, value, acquisition_date, office_id) VALUES (?, ?, ?, ?, ?, ?, ?)");
+                        $item_status = 'available';
+                        $item_quantity = 1;
+                        $acquisition_date = date('Y-m-d');
+                        $item_stmt->bind_param("isisdss", $asset_id, $item_description, $item_quantity, $item_status, $unit_cost, $acquisition_date, $office_id);
+                        $item_stmt->execute();
+                    }
+                    
+                    $message = "Asset added successfully!";
+                    $message_type = "success";
+                    
+                    logSystemAction($_SESSION['user_id'], 'asset_added', 'asset_management', "Added asset: {$description}");
+                } else {
+                    throw new Exception("Failed to insert asset: " . $stmt->error);
                 }
             }
-            
-            // Create individual asset items for each unit
-            for ($i = 1; $i <= $quantity; $i++) {
-                $item_description = $description . ' - Item ' . $i;
-                $item_stmt = $conn->prepare("INSERT INTO asset_items (asset_id, description, quantity, status, value, acquisition_date, office_id) VALUES (?, ?, ?, ?, ?, ?, ?)");
-                $item_status = 'available';
-                $item_quantity = 1;
-                $acquisition_date = date('Y-m-d');
-                $item_stmt->bind_param("isisdss", $asset_id, $item_description, $item_quantity, $item_status, $unit_cost, $acquisition_date, $office_id);
-                $item_stmt->execute();
-            }
-            
-            $conn->commit();
-            $message = "Asset added successfully!";
-            $message_type = "success";
-            
-            logSystemAction($_SESSION['user_id'], 'asset_added', 'asset_management', "Added asset: {$description}");
             
         } catch (Exception $e) {
-            $conn->rollback();
             $message = "Error adding asset: " . $e->getMessage();
             $message_type = "danger";
         }
     }
 }
 
-// UPDATE - Edit asset
-if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['action'] == 'edit') {
-    $id = intval($_POST['id'] ?? 0);
-    $asset_categories_id = intval($_POST['asset_categories_id'] ?? 0);
-    $description = trim($_POST['description'] ?? '');
-    $quantity = intval($_POST['quantity'] ?? 0);
-    $unit_cost = floatval($_POST['unit_cost'] ?? 0);
-    $office_id = intval($_POST['office_id'] ?? 0);
+
+// AJAX handler to get asset items
+if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['action']) && $_GET['action'] == 'get_items') {
+    $asset_id = intval($_GET['asset_id'] ?? 0);
     
-    // Get category code for specific data handling
-    $category_code = '';
-    $category_stmt = $conn->prepare("SELECT category_code FROM asset_categories WHERE id = ?");
-    $category_stmt->bind_param("i", $asset_categories_id);
-    $category_stmt->execute();
-    $category_result = $category_stmt->get_result();
-    if ($category_row = $category_result->fetch_assoc()) {
-        $category_code = $category_row['category_code'];
-    }
-    $category_stmt->close();
-    
-    // Validation
-    if (empty($description)) {
-        $message = "Asset description is required.";
-        $message_type = "danger";
-    } elseif ($asset_categories_id <= 0) {
-        $message = "Please select a category.";
-        $message_type = "danger";
-    } elseif ($office_id <= 0) {
-        $message = "Please select an office.";
-        $message_type = "danger";
-    } elseif ($quantity <= 0) {
-        $message = "Quantity must be greater than 0.";
-        $message_type = "danger";
-    } elseif ($unit_cost < 0) {
-        $message = "Unit cost cannot be negative.";
-        $message_type = "danger";
-    } else {
+    if ($asset_id > 0) {
         try {
-            // Start transaction
-            $conn->begin_transaction();
+            $items_query = "SELECT ai.*, a.description as asset_description 
+                         FROM asset_items ai 
+                         LEFT JOIN assets a ON ai.asset_id = a.id 
+                         WHERE ai.asset_id = ? 
+                         ORDER BY ai.id";
+            $items_stmt = $conn->prepare($items_query);
+            $items_stmt->bind_param("i", $asset_id);
+            $items_stmt->execute();
+            $items_result = $items_stmt->get_result();
             
-            // Update main asset
-            $stmt = $conn->prepare("UPDATE assets SET asset_categories_id = ?, description = ?, quantity = ?, unit_cost = ?, office_id = ? WHERE id = ?");
-            $stmt->bind_param("isidii", $asset_categories_id, $description, $quantity, $unit_cost, $office_id, $id);
-            $stmt->execute();
-            
-            // Handle specific asset data
-            if (!empty($category_code)) {
-                $specific_data = [];
-                $fields = $assetManager->getCategoryFormFields($category_code);
-                
-                foreach ($fields as $field_name => $field_config) {
-                    if ($field_config['type'] === 'checkbox') {
-                        $specific_data[$field_name] = isset($_POST[$field_name]) ? 1 : 0;
-                    } else {
-                        $specific_data[$field_name] = $_POST[$field_name] ?? '';
-                    }
-                }
-                
-                // Remove empty values to avoid database issues
-                $specific_data = array_filter($specific_data, function($value) {
-                    return $value !== '' && $value !== null;
-                });
-                
-                if (!empty($specific_data)) {
-                    $assetManager->saveSpecificAssetData($id, $category_code, $specific_data, $_SESSION['user_id']);
-                }
+            $items = [];
+            while ($row = $items_result->fetch_assoc()) {
+                $items[] = $row;
             }
             
-            // Handle asset items quantity adjustment
-            $current_items_query = "SELECT COUNT(*) as current_count FROM asset_items WHERE asset_id = ?";
-            $current_items_stmt = $conn->prepare($current_items_query);
-            $current_items_stmt->bind_param("i", $id);
-            $current_items_stmt->execute();
-            $current_items_result = $current_items_stmt->get_result();
-            $current_items_count = $current_items_result->fetch_assoc()['current_count'];
-            
-            if ($quantity > $current_items_count) {
-                // Add new items
-                $items_to_add = $quantity - $current_items_count;
-                for ($i = 1; $i <= $items_to_add; $i++) {
-                    $item_number = $current_items_count + $i;
-                    $item_description = $description . ' - Item ' . $item_number;
-                    $item_stmt = $conn->prepare("INSERT INTO asset_items (asset_id, description, quantity, status, value, acquisition_date, office_id) VALUES (?, ?, ?, ?, ?, ?, ?)");
-                    $item_status = 'available';
-                    $item_quantity = 1;
-                    $acquisition_date = date('Y-m-d');
-                    $item_stmt->bind_param("isisdss", $id, $item_description, $item_quantity, $item_status, $unit_cost, $acquisition_date, $office_id);
-                    $item_stmt->execute();
-                }
-            } elseif ($quantity < $current_items_count) {
-                // Note: We don't automatically delete items when quantity decreases
-                // This prevents accidental data loss. Admin should manually manage items.
-                $message = "Asset updated successfully! Note: Quantity decreased from {$current_items_count} to {$quantity}. Please manually manage individual items if needed.";
-            }
-            
-            $conn->commit();
-            if (!isset($message) || empty($message)) {
-                $message = "Asset updated successfully!";
-                $message_type = "success";
-            }
-            
-            logSystemAction($_SESSION['user_id'], 'asset_updated', 'asset_management', "Updated asset: {$description} (ID: {$id})");
+            header('Content-Type: application/json');
+            echo json_encode(['success' => true, 'items' => $items]);
+            exit;
             
         } catch (Exception $e) {
-            $conn->rollback();
-            $message = "Error updating asset: " . $e->getMessage();
-            $message_type = "danger";
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+            exit;
         }
-    }
-}
-
-// DELETE - Delete asset
-if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['action'] == 'delete') {
-    $id = intval($_POST['id'] ?? 0);
-    
-    try {
-        // Start transaction
-        $conn->begin_transaction();
-        
-        // Get category code for specific data cleanup
-        $category_code = '';
-        $category_stmt = $conn->prepare("SELECT ac.category_code FROM assets a JOIN asset_categories ac ON a.asset_categories_id = ac.id WHERE a.id = ?");
-        $category_stmt->bind_param("i", $id);
-        $category_stmt->execute();
-        $category_result = $category_stmt->get_result();
-        if ($category_row = $category_result->fetch_assoc()) {
-            $category_code = $category_row['category_code'];
-        }
-        $category_stmt->close();
-        
-        // Check if asset has related items
-        $check_stmt = $conn->prepare("SELECT COUNT(*) as count FROM asset_items WHERE asset_id = ?");
-        $check_stmt->bind_param("i", $id);
-        $check_stmt->execute();
-        $result = $check_stmt->get_result();
-        $row = $result->fetch_assoc();
-        
-        if ($row['count'] > 0) {
-            $message = "Cannot delete asset. It has associated asset items.";
-            $message_type = "danger";
-            $conn->rollback();
-        } else {
-            // Delete specific asset data first
-            if (!empty($category_code)) {
-                $assetManager->deleteSpecificAssetData($id, $category_code);
-            }
-            
-            // Delete main asset
-            $stmt = $conn->prepare("DELETE FROM assets WHERE id = ?");
-            $stmt->bind_param("i", $id);
-            $stmt->execute();
-            
-            $conn->commit();
-            $message = "Asset deleted successfully!";
-            $message_type = "success";
-            
-            logSystemAction($_SESSION['user_id'], 'asset_deleted', 'asset_management', "Deleted asset ID: {$id}");
-        }
-    } catch (Exception $e) {
-        $conn->rollback();
-        $message = "Error deleting asset: " . $e->getMessage();
-        $message_type = "danger";
+    } else {
+        header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'error' => 'Invalid asset ID']);
+        exit;
     }
 }
 
@@ -297,16 +206,10 @@ $search_filter = isset($_GET['search']) ? trim($_GET['search']) : '';
 // Get assets with category and office information
 $assets = [];
 try {
-    $sql = "SELECT a.*, ac.category_name, ac.category_code, o.office_name,
-            COALESCE(ai.item_count, 0) as individual_items_count
+    $sql = "SELECT a.*, ac.category_name, ac.category_code, o.office_name
             FROM assets a 
             LEFT JOIN asset_categories ac ON a.asset_categories_id = ac.id 
             LEFT JOIN offices o ON a.office_id = o.id 
-            LEFT JOIN (
-                SELECT asset_id, COUNT(*) as item_count 
-                FROM asset_items 
-                GROUP BY asset_id
-            ) ai ON a.id = ai.asset_id
             WHERE 1=1";
     
     $params = [];
@@ -596,12 +499,9 @@ try {
                 <table class="table table-hover" id="assetsTable">
                     <thead>
                         <tr>
-                            <th>ID</th>
                             <th>Category</th>
                             <th>Description</th>
                             <th>Quantity</th>
-                            <th>Items</th>
-                            <th>Unit Cost</th>
                             <th>Total Value</th>
                             <th>Office</th>
                             <th>Created</th>
@@ -612,7 +512,6 @@ try {
                         <?php if (!empty($assets)): ?>
                             <?php foreach ($assets as $asset): ?>
                                 <tr>
-                                    <td><?php echo $asset['id']; ?></td>
                                     <td>
                                         <span class="category-badge">
                                             <?php echo htmlspecialchars($asset['category_code'] ?? 'N/A'); ?>
@@ -622,15 +521,6 @@ try {
                                     </td>
                                     <td><?php echo htmlspecialchars($asset['description']); ?></td>
                                     <td><?php echo $asset['quantity']; ?></td>
-                                    <td>
-                                        <span class="badge <?php echo $asset['individual_items_count'] == $asset['quantity'] ? 'bg-success' : 'bg-warning'; ?>">
-                                            <?php echo $asset['individual_items_count']; ?>
-                                        </span>
-                                        <?php if ($asset['individual_items_count'] != $asset['quantity']): ?>
-                                            <i class="bi bi-exclamation-triangle text-warning" title="Quantity mismatch"></i>
-                                        <?php endif; ?>
-                                    </td>
-                                    <td class="text-value"><?php echo number_format($asset['unit_cost'], 2); ?></td>
                                     <td class="text-value"><?php echo number_format($asset['quantity'] * $asset['unit_cost'], 2); ?></td>
                                     <td><?php echo htmlspecialchars($asset['office_name'] ?? 'N/A'); ?></td>
                                     <td><small><?php echo date('M j, Y', strtotime($asset['created_at'])); ?></small></td>
@@ -638,18 +528,12 @@ try {
                                         <button class="btn btn-sm btn-outline-info btn-action" onclick="viewAsset(<?php echo $asset['id']; ?>)">
                                             <i class="bi bi-eye"></i>
                                         </button>
-                                        <button class="btn btn-sm btn-outline-primary btn-action" onclick="editAsset(<?php echo $asset['id']; ?>)">
-                                            <i class="bi bi-pencil"></i>
-                                        </button>
-                                        <button class="btn btn-sm btn-outline-danger btn-action" onclick="deleteAsset(<?php echo $asset['id']; ?>, '<?php echo htmlspecialchars($asset['description']); ?>')">
-                                            <i class="bi bi-trash"></i>
-                                        </button>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
                         <?php else: ?>
                             <tr>
-                                <td colspan="10" class="text-center text-muted py-4">
+                                <td colspan="7" class="text-center text-muted py-4">
                                     <i class="bi bi-inbox fs-1"></i>
                                     <p class="mt-2">No assets found. Click "Add Asset" to create your first asset.</p>
                                 </td>
@@ -735,75 +619,6 @@ try {
         </div>
     </div>
     
-    <!-- Edit Asset Modal -->
-    <div class="modal fade" id="editAssetModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title"><i class="bi bi-pencil"></i> Edit Asset</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                </div>
-                <form method="POST" id="editAssetForm">
-                    <div class="modal-body">
-                        <input type="hidden" name="action" value="edit">
-                        <input type="hidden" name="id" id="editAssetId">
-                        
-                        <div class="mb-3">
-                            <label class="form-label">Category *</label>
-                            <select class="form-select" name="asset_categories_id" id="editCategory" required>
-                                <option value="">Select Category</option>
-                                <?php foreach ($categories as $category): ?>
-                                    <option value="<?php echo $category['id']; ?>">
-                                        <?php echo htmlspecialchars($category['category_code'] . ' - ' . $category['category_name']); ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label class="form-label">Description *</label>
-                            <input type="text" class="form-control" name="description" id="editDescription" required>
-                        </div>
-                        
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label class="form-label">Quantity *</label>
-                                    <input type="number" class="form-control" name="quantity" id="editQuantity" min="1" required>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label class="form-label">Unit Cost *</label>
-                                    <input type="number" class="form-control" name="unit_cost" id="editUnitCost" step="0.01" min="0" required>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label class="form-label">Office *</label>
-                            <select class="form-select" name="office_id" id="editOffice" required>
-                                <option value="">Select Office</option>
-                                <?php foreach ($offices as $office): ?>
-                                    <option value="<?php echo $office['id']; ?>">
-                                        <?php echo htmlspecialchars($office['office_name']); ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        
-                        <div id="editCategorySpecificFields"></div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-primary">
-                            <i class="bi bi-pencil"></i> Update Asset
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
     
     <!-- View Asset Modal -->
     <div class="modal fade" id="viewAssetModal" tabindex="-1">
@@ -823,32 +638,6 @@ try {
         </div>
     </div>
     
-    <!-- Delete Confirmation Modal -->
-    <div class="modal fade" id="deleteModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header bg-danger text-white">
-                    <h5 class="modal-title"><i class="bi bi-exclamation-triangle"></i> Confirm Delete</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <p>Are you sure you want to delete this asset?</p>
-                    <p><strong id="deleteAssetName"></strong></p>
-                    <p class="text-danger">This action cannot be undone.</p>
-                </div>
-                <form method="POST" id="deleteForm">
-                    <input type="hidden" name="action" value="delete">
-                    <input type="hidden" name="id" id="deleteAssetId">
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-danger">
-                            <i class="bi bi-trash"></i> Delete Asset
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
     
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
@@ -1111,32 +900,46 @@ try {
             return category ? category.category_code : null;
         }
         
-        // Edit asset function
-        function editAsset(id) {
-            const asset = assetData.find(a => a.id == id);
-            if (asset) {
-                document.getElementById('editAssetId').value = asset.id;
-                document.getElementById('editCategory').value = asset.asset_categories_id || '';
-                document.getElementById('editDescription').value = asset.description || '';
-                document.getElementById('editQuantity').value = asset.quantity || 0;
-                document.getElementById('editUnitCost').value = asset.unit_cost || 0;
-                document.getElementById('editOffice').value = asset.office_id || '';
-                
-                // Generate category-specific fields for edit modal
-                const categoryCode = getCategoryCode(asset.asset_categories_id);
-                if (categoryCode) {
-                    generateCategoryFields(categoryCode, 'editCategorySpecificFields', asset);
-                }
-                
-                new bootstrap.Modal(document.getElementById('editAssetModal')).show();
-            }
+        
+        // Load asset items function
+        function loadAssetItems(assetId) {
+            fetch('assets.php?action=get_items&asset_id=' + assetId)
+                .then(response => response.json())
+                .then(data => {
+                    const tbody = document.getElementById('assetItemsBody_' + assetId);
+                    if (data.items && data.items.length > 0) {
+                        let html = '';
+                        data.items.forEach(item => {
+                            const statusBadge = getStatusBadge(item.status);
+                            html += '<tr>';
+                            html += '<td>' + item.id + '</td>';
+                            html += '<td>' + item.description + '</td>';
+                            html += '<td>' + statusBadge + '</td>';
+                            html += '<td>₱' + parseFloat(item.value).toFixed(2) + '</td>';
+                            html += '<td>' + new Date(item.acquisition_date).toLocaleDateString() + '</td>';
+                            html += '</tr>';
+                        });
+                        tbody.innerHTML = html;
+                    } else {
+                        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No individual items found for this asset.</td></tr>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading asset items:', error);
+                    const tbody = document.getElementById('assetItemsBody_' + assetId);
+                    tbody.innerHTML = '<tr><td colspan="5" class="text-center text-danger">Error loading items.</td></tr>';
+                });
         }
         
-        // Delete asset function
-        function deleteAsset(id, name) {
-            document.getElementById('deleteAssetId').value = id;
-            document.getElementById('deleteAssetName').textContent = name;
-            new bootstrap.Modal(document.getElementById('deleteModal')).show();
+        // Get status badge HTML
+        function getStatusBadge(status) {
+            const badges = {
+                'available': '<span class="badge bg-success">Available</span>',
+                'in_use': '<span class="badge bg-primary">In Use</span>',
+                'maintenance': '<span class="badge bg-warning">Maintenance</span>',
+                'disposed': '<span class="badge bg-danger">Disposed</span>'
+            };
+            return badges[status] || '<span class="badge bg-secondary">Unknown</span>';
         }
         
         // View asset function
@@ -1158,6 +961,25 @@ try {
                 html += '<tr><td><strong>Office:</strong></td><td>' + (asset.office_name || 'N/A') + '</td></tr>';
                 html += '<tr><td><strong>Created:</strong></td><td>' + new Date(asset.created_at).toLocaleDateString() + '</td></tr>';
                 html += '</table>';
+                html += '</div>';
+                
+                // Asset Items Information
+                html += '<div class="col-md-12">';
+                html += '<h6 class="text-primary mb-3"><i class="bi bi-list-ul"></i> Individual Asset Items</h6>';
+                html += '<div class="table-responsive">';
+                html += '<table class="table table-sm table-bordered">';
+                html += '<thead><tr>';
+                html += '<th>Item ID</th>';
+                html += '<th>Description</th>';
+                html += '<th>Status</th>';
+                html += '<th>Value</th>';
+                html += '<th>Acquisition Date</th>';
+                html += '</tr></thead>';
+                html += '<tbody id="assetItemsBody_' + id + '">';
+                html += '<tr><td colspan="5" class="text-center"><div class="spinner-border spinner-border-sm" role="status"></div> Loading items...</td></tr>';
+                html += '</tbody>';
+                html += '</table>';
+                html += '</div>';
                 html += '</div>';
                 
                 // Category-Specific Information
@@ -1203,6 +1025,11 @@ try {
                 
                 document.getElementById('viewAssetContent').innerHTML = html;
                 new bootstrap.Modal(document.getElementById('viewAssetModal')).show();
+                
+                // Load asset items after modal is shown
+                setTimeout(() => {
+                    loadAssetItems(id);
+                }, 500);
             }
         }
         
@@ -1280,14 +1107,6 @@ try {
                 });
             }
             
-            // Edit asset modal category change
-            const editCategorySelect = document.getElementById('editCategory');
-            if (editCategorySelect) {
-                editCategorySelect.addEventListener('change', function() {
-                    const categoryCode = getCategoryCode(this.value);
-                    generateCategoryFields(categoryCode, 'editCategorySpecificFields');
-                });
-            }
         });
     </script>
 </body>
