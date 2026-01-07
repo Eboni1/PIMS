@@ -68,14 +68,14 @@ if (!$conn || $conn->connect_error) {
 
         // Asset Categories Summary
         $categories_query = "SELECT 
-            ac.code,
-            ac.name,
+            ac.category_code as code,
+            ac.category_name as name,
             COUNT(a.id) as asset_count,
             SUM(a.quantity) as total_quantity,
             SUM(a.quantity * a.unit_cost) as total_value
             FROM asset_categories ac
             LEFT JOIN assets a ON ac.id = a.asset_categories_id
-            GROUP BY ac.id, ac.code, ac.name
+            GROUP BY ac.id, ac.category_code, ac.category_name
             ORDER BY total_value DESC";
         $categories_result = $conn->query($categories_query);
         $stats['categories'] = [];

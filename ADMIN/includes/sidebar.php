@@ -161,6 +161,90 @@ try {
     overflow-x: hidden;
 }
 
+/* Dropdown Styles */
+.sidebar-dropdown {
+    position: relative;
+}
+
+.sidebar-dropdown-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 0.875rem 1.5rem;
+    color: rgba(255, 255, 255, 0.8);
+    text-decoration: none;
+    transition: all 0.3s ease;
+    border-left: 3px solid transparent;
+    font-weight: 500;
+    background: none;
+    border: none;
+    cursor: pointer;
+}
+
+.sidebar-dropdown-toggle:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    border-left-color: white;
+}
+
+.sidebar-dropdown-toggle.active {
+    background: rgba(255, 255, 255, 0.15);
+    color: white;
+    border-left-color: white;
+}
+
+.sidebar-dropdown-menu {
+    background: rgba(0, 0, 0, 0.2);
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.sidebar-dropdown-menu.collapse:not(.show) {
+    display: none;
+}
+
+.sidebar-dropdown-menu.collapse.show {
+    display: block;
+}
+
+.sidebar-dropdown-item {
+    display: block;
+    padding: 0.625rem 1.5rem 0.625rem 3rem;
+    color: rgba(255, 255, 255, 0.7);
+    text-decoration: none;
+    transition: all 0.3s ease;
+    font-size: 0.9rem;
+    border-left: 3px solid transparent;
+}
+
+.sidebar-dropdown-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    border-left-color: white;
+}
+
+.sidebar-dropdown-item.active {
+    background: rgba(255, 255, 255, 0.15);
+    color: white;
+    border-left-color: white;
+}
+
+.sidebar-dropdown i {
+    width: 20px;
+    margin-right: 0.75rem;
+}
+
+.sidebar-dropdown-toggle i:last-child {
+    margin-right: 0;
+    transition: transform 0.3s ease;
+}
+
+.sidebar-dropdown-toggle[aria-expanded="true"] i:last-child {
+    transform: rotate(180deg);
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
     .main-content {
@@ -212,18 +296,33 @@ try {
             <i class="bi bi-speedometer2"></i>
             Dashboard
         </a>
-        <a href="assets.php" class="sidebar-nav-item <?php echo $current_page == 'assets.php' ? 'active' : ''; ?>">
-            <i class="bi bi-box"></i>
-            Assets
-        </a>
-        <a href="asset_items.php" class="sidebar-nav-item <?php echo $current_page == 'asset_items.php' ? 'active' : ''; ?>">
-            <i class="bi bi-collection"></i>
-            Asset Items
-        </a>
-        <a href="consumables.php" class="sidebar-nav-item <?php echo $current_page == 'consumables.php' ? 'active' : ''; ?>">
-            <i class="bi bi-archive"></i>
-            Consumables
-        </a>
+        <div class="sidebar-dropdown">
+            <button class="sidebar-dropdown-toggle <?php echo (in_array($current_page, ['assets.php', 'consumables.php'])) ? 'active' : ''; ?>" 
+                    type="button" data-bs-toggle="collapse" data-bs-target="#inventoryDropdown" 
+                    aria-expanded="<?php echo (in_array($current_page, ['assets.php', 'consumables.php'])) ? 'true' : 'false'; ?>">
+                <div>
+                    <i class="bi bi-archive"></i>
+                    Inventory
+                </div>
+                <i class="bi bi-chevron-down"></i>
+            </button>
+            <div class="collapse <?php echo (in_array($current_page, ['assets.php', 'consumables.php'])) ? 'show' : ''; ?>" id="inventoryDropdown">
+                <ul class="sidebar-dropdown-menu">
+                    <li>
+                        <a href="assets.php" class="sidebar-dropdown-item <?php echo $current_page == 'assets.php' ? 'active' : ''; ?>">
+                            <i class="bi bi-box"></i>
+                            Asset Management
+                        </a>
+                    </li>
+                    <li>
+                        <a href="consumables.php" class="sidebar-dropdown-item <?php echo $current_page == 'consumables.php' ? 'active' : ''; ?>">
+                            <i class="bi bi-archive"></i>
+                            Consumables
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
         <a href="employees.php" class="sidebar-nav-item <?php echo $current_page == 'employees.php' ? 'active' : ''; ?>">
             <i class="bi bi-people"></i>
             Employees
