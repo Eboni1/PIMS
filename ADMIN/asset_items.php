@@ -51,11 +51,12 @@ $items_stmt->close();
 
 // Calculate statistics
 $total_items = count($items);
-$available_items = count(array_filter($items, function($item) { return $item['status'] === 'available'; }));
-$in_use_items = count(array_filter($items, function($item) { return $item['status'] === 'in_use'; }));
-$maintenance_items = count(array_filter($items, function($item) { return $item['status'] === 'maintenance'; }));
-$pending_items = count(array_filter($items, function($item) { return $item['status'] === 'pending'; }));
-$disposed_items = count(array_filter($items, function($item) { return $item['status'] === 'disposed'; }));
+$serviceable_items = count(array_filter($items, function($item) { return $item['status'] === 'available'; }));
+$unserviceable_items = count(array_filter($items, function($item) { return $item['status'] === 'in_use'; }));
+$redtagged_items = count(array_filter($items, function($item) { return $item['status'] === 'maintenance'; }));
+$borrowed_items = count(array_filter($items, function($item) { return $item['status'] === 'disposed'; }));
+$notag_items = count(array_filter($items, function($item) { return $item['status'] === 'no_tag'; }));
+
 ?>
 
 <!DOCTYPE html>
@@ -137,11 +138,11 @@ $disposed_items = count(array_filter($items, function($item) { return $item['sta
             font-weight: 600;
         }
         
-        .status-available { background-color: #d4edda; color: #155724; }
-        .status-in_use { background-color: #cce5ff; color: #004085; }
-        .status-maintenance { background-color: #fff3cd; color: #856404; }
-        .status-pending { background-color: #e2e3e5; color: #383d41; }
-        .status-disposed { background-color: #f8d7da; color: #721c24; }
+        .status-serviceable { background-color: #d4edda; color: #155724; }
+        .status-unserviceable { background-color: #cce5ff; color: #004085; }
+        .status-red-tagged { background-color: #f8d7da; color: #721c24; }
+        .status-borrowed { background-color: #fff3cd; color: #856404; }
+        .status-notag { background-color: #e2e3e5; color: #383d41; }
         
         .text-value {
             font-weight: 600;
@@ -229,32 +230,32 @@ $disposed_items = count(array_filter($items, function($item) { return $item['sta
         <div class="row mb-4">
             <div class="col-lg-2 col-md-4 col-sm-6">
                 <div class="stats-card">
-                    <div class="stats-number"><?php echo $available_items; ?></div>
-                    <div class="stats-label"><i class="bi bi-check-circle"></i> Available</div>
+                    <div class="stats-number"><?php echo $serviceable_items; ?></div>
+                    <div class="stats-label"><i class="bi bi-check-circle"></i> Serviceable</div>
                 </div>
             </div>
             <div class="col-lg-2 col-md-4 col-sm-6">
                 <div class="stats-card">
-                    <div class="stats-number"><?php echo $in_use_items; ?></div>
-                    <div class="stats-label"><i class="bi bi-person"></i> In Use</div>
+                    <div class="stats-number"><?php echo $unserviceable_items; ?></div>
+                    <div class="stats-label"><i class="bi bi-x-circle"></i> Unserviceable</div>
                 </div>
             </div>
             <div class="col-lg-2 col-md-4 col-sm-6">
                 <div class="stats-card">
-                    <div class="stats-number"><?php echo $maintenance_items; ?></div>
-                    <div class="stats-label"><i class="bi bi-tools"></i> Maintenance</div>
+                    <div class="stats-number"><?php echo $redtagged_items; ?></div>
+                    <div class="stats-label"><i class="bi bi-exclamation-triangle"></i> Red-Tagged</div>
                 </div>
             </div>
             <div class="col-lg-2 col-md-4 col-sm-6">
                 <div class="stats-card">
-                    <div class="stats-number"><?php echo $pending_items; ?></div>
-                    <div class="stats-label"><i class="bi bi-clock"></i> Pending</div>
+                    <div class="stats-number"><?php echo $notag_items; ?></div>
+                    <div class="stats-label"><i class="bi bi-dash-circle"></i> No Tag</div>
                 </div>
             </div>
             <div class="col-lg-2 col-md-4 col-sm-6">
                 <div class="stats-card">
-                    <div class="stats-number"><?php echo $disposed_items; ?></div>
-                    <div class="stats-label"><i class="bi bi-trash"></i> Disposed</div>
+                    <div class="stats-number"><?php echo $borrowed_items; ?></div>
+                    <div class="stats-label"><i class="bi bi-arrow-left-right"></i> Borrowed</div>
                 </div>
             </div>
         </div>
@@ -294,24 +295,29 @@ $disposed_items = count(array_filter($items, function($item) { return $item['sta
                                         $status_class = '';
                                         switch($item['status']) {
                                             case 'available':
-                                                $status_class = 'status-available';
+                                                $status_class = 'status-serviceable';
+                                                $display_status = 'Serviceable';
                                                 break;
                                             case 'in_use':
-                                                $status_class = 'status-in_use';
+                                                $status_class = 'status-unserviceable';
+                                                $display_status = 'Unserviceable';
                                                 break;
                                             case 'maintenance':
-                                                $status_class = 'status-maintenance';
-                                                break;
-                                            case 'pending':
-                                                $status_class = 'status-pending';
+                                                $status_class = 'status-red-tagged';
+                                                $display_status = 'Red-Tagged';
                                                 break;
                                             case 'disposed':
-                                                $status_class = 'status-disposed';
+                                                $status_class = 'status-borrowed';
+                                                $display_status = 'Borrowed';
+                                                break;
+                                            case 'no_tag':
+                                                $status_class = 'status-notag';
+                                                $display_status = 'No Tag';
                                                 break;
                                         }
                                         ?>
                                         <span class="status-badge <?php echo $status_class; ?>">
-                                            <?php echo ucfirst($item['status']); ?>
+                                            <?php echo isset($display_status) ? $display_status : ucfirst($item['status']); ?>
                                         </span>
                                     </td>
                                     <td class="text-value"><?php echo number_format($item['value'], 2); ?></td>

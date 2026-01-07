@@ -3,6 +3,11 @@ session_start();
 require_once 'config.php';
 require_once 'includes/logger.php';
 
+// Generate CSRF token early - before any POST processing
+if (!isset($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
 // Get system settings for logo and theme
 $system_settings = [];
 try {
@@ -159,13 +164,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 // Check for session timeout message
 if (isset($_GET['timeout']) && $_GET['timeout'] == '1') {
     $error = "Your session has expired due to inactivity. Please log in again.";
-}
+}?>
 
-// Generate CSRF token
-if (!isset($_SESSION['csrf_token'])) {
-    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-}
-?>
 
 <!DOCTYPE html>
 <html lang="en">

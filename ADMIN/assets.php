@@ -100,7 +100,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['a
                     // Create additional asset items for new quantity
                     for ($i = 1; $i <= $quantity; $i++) {
                         $item_description = mysqli_real_escape_string($conn, $description);
-                        $item_status = 'pending';
+                        $item_status = 'no_tag';
                         $acquisition_date = date('Y-m-d');
                         
                         $item_sql = "INSERT INTO asset_items (asset_id, description, status, value, acquisition_date, office_id) 
@@ -164,7 +164,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['a
                     // Create individual asset items for each unit
                     for ($i = 1; $i <= $quantity; $i++) {
                         $item_description = mysqli_real_escape_string($conn, $description);
-                        $item_status = 'pending';
+                        $item_status = 'no_tag';
                         $acquisition_date = date('Y-m-d');
                         
                         $item_sql = "INSERT INTO asset_items (asset_id, description, status, value, acquisition_date, office_id) 

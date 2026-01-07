@@ -40,7 +40,7 @@ try {
     $types = '';
     
     // Filter by asset items that might need inventory tags (you can customize this logic)
-    $sql .= " AND (ai.description LIKE '%no tag%' OR ai.description LIKE '%untagged%' OR ai.status = 'pending')";
+    $sql .= " AND (ai.description LIKE '%no tag%' OR ai.description LIKE '%untagged%' OR ai.status = 'no_tag')";
     
     if ($office_filter > 0) {
         $sql .= " AND ai.office_id = ?";
