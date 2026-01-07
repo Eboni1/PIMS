@@ -353,6 +353,9 @@ foreach ($defaults as $key => $value) {
             color: #191BA9;
         }
     </style>
+    <!-- Custom CSS -->
+    <link href="../assets/css/index.css" rel="stylesheet">
+    <link href="../assets/css/theme-custom.css" rel="stylesheet">
 </head>
 <body>
     <?php
@@ -661,9 +664,8 @@ foreach ($defaults as $key => $value) {
     
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <?php require_once 'includes/sidebar-scripts.php'; ?>
     <script>
-        <?php require_once 'includes/sidebar-scripts.php'; ?>
-        
         // Dashboard functions
         function refreshDashboard() {
             location.reload();
