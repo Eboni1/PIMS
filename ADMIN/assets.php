@@ -99,7 +99,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['a
                     
                     // Create additional asset items for new quantity
                     for ($i = 1; $i <= $quantity; $i++) {
-                        $item_description = mysqli_real_escape_string($conn, $description . ' - ' . $unit . ' ' . ($existing_asset['quantity'] + $i));
+                        $item_description = mysqli_real_escape_string($conn, $description);
                         $item_status = 'pending';
                         $acquisition_date = date('Y-m-d');
                         
@@ -163,7 +163,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['a
                     
                     // Create individual asset items for each unit
                     for ($i = 1; $i <= $quantity; $i++) {
-                        $item_description = mysqli_real_escape_string($conn, $description . ' - ' . $unit . ' ' . $i);
+                        $item_description = mysqli_real_escape_string($conn, $description);
                         $item_status = 'pending';
                         $acquisition_date = date('Y-m-d');
                         
@@ -578,6 +578,9 @@ try {
                                     <td><?php echo htmlspecialchars($asset['office_name'] ?? 'N/A'); ?></td>
                                     <td><small><?php echo date('M j, Y', strtotime($asset['created_at'])); ?></small></td>
                                     <td>
+                                        <a href="asset_items.php?asset_id=<?php echo $asset['id']; ?>" class="btn btn-sm btn-outline-info">
+                                            <i class="bi bi-eye"></i> View Items
+                                        </a>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
@@ -586,6 +589,15 @@ try {
                                 <td colspan="7" class="text-center text-muted py-4">
                                     <i class="bi bi-inbox fs-1"></i>
                                     <p class="mt-2">No assets found. Click "Add Asset" to create your first asset.</p>
+                                </td>
+                            </tr>
+                        <?php endif; ?>
+                        
+                        <!-- Debug: Show total assets count -->
+                        <?php if (!empty($assets)): ?>
+                            <tr>
+                                <td colspan="7" class="text-center text-muted py-2">
+                                    <small>Total assets loaded: <?php echo count($assets); ?></small>
                                 </td>
                             </tr>
                         <?php endif; ?>
@@ -680,8 +692,6 @@ try {
                                 <?php endforeach; ?>
                             </select>
                         </div>
-                        
-                        <div id="categorySpecificFields"></div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -704,253 +714,6 @@ try {
         // Asset data for editing
         const assetData = <?php echo json_encode($assets); ?>;
         const categoriesData = <?php echo json_encode($categories); ?>;
-        
-        // Category field definitions
-        const categoryFields = <?php echo json_encode([
-            'FF' => [
-                'furniture_type' => ['type' => 'select', 'label' => 'Furniture Type', 'options' => ['desk', 'chair', 'cabinet', 'shelf', 'table', 'sofa', 'bed', 'other']],
-                'material' => ['type' => 'select', 'label' => 'Material', 'options' => ['wood', 'metal', 'plastic', 'glass', 'leather', 'fabric', 'composite']],
-                'color' => ['type' => 'text', 'label' => 'Color'],
-                'dimensions' => ['type' => 'text', 'label' => 'Dimensions (LxWxH)'],
-                'weight_capacity' => ['type' => 'number', 'label' => 'Weight Capacity (kg)'],
-                'manufacturer' => ['type' => 'text', 'label' => 'Manufacturer'],
-                'model_number' => ['type' => 'text', 'label' => 'Model Number'],
-                'purchase_date' => ['type' => 'date', 'label' => 'Purchase Date'],
-                'warranty_expiry' => ['type' => 'date', 'label' => 'Warranty Expiry'],
-                'condition_status' => ['type' => 'select', 'label' => 'Condition', 'options' => ['excellent', 'good', 'fair', 'poor']],
-                'location_building' => ['type' => 'text', 'label' => 'Building'],
-                'location_floor' => ['type' => 'text', 'label' => 'Floor'],
-                'location_room' => ['type' => 'text', 'label' => 'Room'],
-                'assembly_required' => ['type' => 'checkbox', 'label' => 'Assembly Required'],
-                'notes' => ['type' => 'textarea', 'label' => 'Notes']
-            ],
-            'CE' => [
-                'processor' => ['type' => 'text', 'label' => 'Processor'],
-                'ram_capacity' => ['type' => 'text', 'label' => 'RAM Capacity'],
-                'storage_type' => ['type' => 'select', 'label' => 'Storage Type', 'options' => ['hdd', 'ssd', 'hybrid']],
-                'storage_capacity' => ['type' => 'text', 'label' => 'Storage Capacity'],
-                'graphics_card' => ['type' => 'text', 'label' => 'Graphics Card'],
-                'operating_system' => ['type' => 'text', 'label' => 'Operating System'],
-                'mac_address' => ['type' => 'text', 'label' => 'MAC Address'],
-                'ip_address' => ['type' => 'text', 'label' => 'IP Address'],
-                'serial_number' => ['type' => 'text', 'label' => 'Serial Number'],
-                'warranty_provider' => ['type' => 'text', 'label' => 'Warranty Provider'],
-                'warranty_expiry' => ['type' => 'date', 'label' => 'Warranty Expiry'],
-                'purchase_date' => ['type' => 'date', 'label' => 'Purchase Date'],
-                'last_service_date' => ['type' => 'date', 'label' => 'Last Service Date'],
-                'condition_status' => ['type' => 'select', 'label' => 'Condition', 'options' => ['excellent', 'good', 'fair', 'poor']],
-                'assigned_to' => ['type' => 'text', 'label' => 'Assigned To'],
-                'department' => ['type' => 'text', 'label' => 'Department'],
-                'notes' => ['type' => 'textarea', 'label' => 'Notes']
-            ],
-            'VH' => [
-                'plate_number' => ['type' => 'text', 'label' => 'Plate Number', 'required' => true],
-                'engine_number' => ['type' => 'text', 'label' => 'Engine Number'],
-                'chassis_number' => ['type' => 'text', 'label' => 'Chassis Number'],
-                'color' => ['type' => 'text', 'label' => 'Color'],
-                'model' => ['type' => 'text', 'label' => 'Model'],
-                'brand' => ['type' => 'text', 'label' => 'Brand'],
-                'year_manufactured' => ['type' => 'number', 'label' => 'Year Manufactured'],
-                'fuel_type' => ['type' => 'select', 'label' => 'Fuel Type', 'options' => ['gasoline', 'diesel', 'electric', 'hybrid', 'lpg']],
-                'transmission_type' => ['type' => 'select', 'label' => 'Transmission', 'options' => ['manual', 'automatic', 'cvt']],
-                'registration_date' => ['type' => 'date', 'label' => 'Registration Date'],
-                'registration_expiry' => ['type' => 'date', 'label' => 'Registration Expiry'],
-                'insurance_provider' => ['type' => 'text', 'label' => 'Insurance Provider'],
-                'insurance_policy_number' => ['type' => 'text', 'label' => 'Policy Number'],
-                'insurance_expiry' => ['type' => 'date', 'label' => 'Insurance Expiry'],
-                'odometer_reading' => ['type' => 'number', 'label' => 'Odometer Reading'],
-                'last_maintenance_date' => ['type' => 'date', 'label' => 'Last Maintenance'],
-                'next_maintenance_date' => ['type' => 'date', 'label' => 'Next Maintenance'],
-                'condition_status' => ['type' => 'select', 'label' => 'Condition', 'options' => ['excellent', 'good', 'fair', 'poor']],
-                'notes' => ['type' => 'textarea', 'label' => 'Notes']
-            ],
-            'ME' => [
-                'machine_type' => ['type' => 'text', 'label' => 'Machine Type'],
-                'manufacturer' => ['type' => 'text', 'label' => 'Manufacturer'],
-                'model_number' => ['type' => 'text', 'label' => 'Model Number'],
-                'serial_number' => ['type' => 'text', 'label' => 'Serial Number'],
-                'capacity' => ['type' => 'text', 'label' => 'Capacity'],
-                'power_requirements' => ['type' => 'text', 'label' => 'Power Requirements'],
-                'voltage' => ['type' => 'number', 'label' => 'Voltage'],
-                'operating_weight' => ['type' => 'number', 'label' => 'Operating Weight (kg)'],
-                'dimensions' => ['type' => 'text', 'label' => 'Dimensions'],
-                'installation_date' => ['type' => 'date', 'label' => 'Installation Date'],
-                'last_maintenance_date' => ['type' => 'date', 'label' => 'Last Maintenance'],
-                'next_maintenance_date' => ['type' => 'date', 'label' => 'Next Maintenance'],
-                'maintenance_interval_days' => ['type' => 'number', 'label' => 'Maintenance Interval (days)'],
-                'operator_required' => ['type' => 'checkbox', 'label' => 'Operator Required'],
-                'safety_certification' => ['type' => 'text', 'label' => 'Safety Certification'],
-                'certification_expiry' => ['type' => 'date', 'label' => 'Certification Expiry'],
-                'condition_status' => ['type' => 'select', 'label' => 'Condition', 'options' => ['excellent', 'good', 'fair', 'poor']],
-                'location_building' => ['type' => 'text', 'label' => 'Building'],
-                'location_area' => ['type' => 'text', 'label' => 'Area'],
-                'notes' => ['type' => 'textarea', 'label' => 'Notes']
-            ],
-            'BI' => [
-                'building_type' => ['type' => 'select', 'label' => 'Building Type', 'options' => ['office', 'warehouse', 'factory', 'residential', 'commercial', 'other']],
-                'address' => ['type' => 'textarea', 'label' => 'Address', 'required' => true],
-                'city' => ['type' => 'text', 'label' => 'City'],
-                'state' => ['type' => 'text', 'label' => 'State'],
-                'postal_code' => ['type' => 'text', 'label' => 'Postal Code'],
-                'total_floor_area' => ['type' => 'number', 'label' => 'Total Floor Area (sqm)'],
-                'number_of_floors' => ['type' => 'number', 'label' => 'Number of Floors'],
-                'year_built' => ['type' => 'number', 'label' => 'Year Built'],
-                'year_renovated' => ['type' => 'number', 'label' => 'Year Renovated'],
-                'construction_type' => ['type' => 'select', 'label' => 'Construction Type', 'options' => ['concrete', 'wood', 'steel', 'mixed']],
-                'roof_type' => ['type' => 'text', 'label' => 'Roof Type'],
-                'electrical_capacity' => ['type' => 'text', 'label' => 'Electrical Capacity'],
-                'water_supply' => ['type' => 'select', 'label' => 'Water Supply', 'options' => ['municipal', 'well', 'mixed']],
-                'sewage_system' => ['type' => 'select', 'label' => 'Sewage System', 'options' => ['municipal', 'septic_tank', 'mixed']],
-                'fire_safety_system' => ['type' => 'checkbox', 'label' => 'Fire Safety System'],
-                'security_system' => ['type' => 'checkbox', 'label' => 'Security System'],
-                'air_conditioning' => ['type' => 'checkbox', 'label' => 'Air Conditioning'],
-                'elevator_count' => ['type' => 'number', 'label' => 'Elevator Count'],
-                'parking_spaces' => ['type' => 'number', 'label' => 'Parking Spaces'],
-                'property_tax_number' => ['type' => 'text', 'label' => 'Property Tax Number'],
-                'land_title_number' => ['type' => 'text', 'label' => 'Land Title Number'],
-                'zoning_classification' => ['type' => 'text', 'label' => 'Zoning Classification'],
-                'condition_status' => ['type' => 'select', 'label' => 'Condition', 'options' => ['excellent', 'good', 'fair', 'poor']],
-                'notes' => ['type' => 'textarea', 'label' => 'Notes']
-            ],
-            'LD' => [
-                'land_type' => ['type' => 'select', 'label' => 'Land Type', 'options' => ['commercial', 'residential', 'agricultural', 'industrial', 'mixed']],
-                'address' => ['type' => 'textarea', 'label' => 'Address', 'required' => true],
-                'city' => ['type' => 'text', 'label' => 'City'],
-                'state' => ['type' => 'text', 'label' => 'State'],
-                'postal_code' => ['type' => 'text', 'label' => 'Postal Code'],
-                'lot_area' => ['type' => 'number', 'label' => 'Lot Area (sqm)'],
-                'frontage' => ['type' => 'number', 'label' => 'Frontage (meters)'],
-                'depth' => ['type' => 'number', 'label' => 'Depth (meters)'],
-                'shape' => ['type' => 'select', 'label' => 'Shape', 'options' => ['regular', 'irregular']],
-                'topography' => ['type' => 'select', 'label' => 'Topography', 'options' => ['flat', 'sloping', 'hilly', 'mountainous']],
-                'zoning_classification' => ['type' => 'text', 'label' => 'Zoning Classification'],
-                'land_classification' => ['type' => 'text', 'label' => 'Land Classification'],
-                'tax_declaration_number' => ['type' => 'text', 'label' => 'Tax Declaration Number'],
-                'land_title_number' => ['type' => 'text', 'label' => 'Land Title Number'],
-                'survey_number' => ['type' => 'text', 'label' => 'Survey Number'],
-                'corner_lot' => ['type' => 'checkbox', 'label' => 'Corner Lot'],
-                'road_access' => ['type' => 'select', 'label' => 'Road Access', 'options' => ['paved', 'gravel', 'dirt', 'none']],
-                'utilities_available' => ['type' => 'select', 'label' => 'Utilities Available', 'options' => ['full', 'partial', 'none']],
-                'flood_prone' => ['type' => 'checkbox', 'label' => 'Flood Prone'],
-                'encumbrances' => ['type' => 'textarea', 'label' => 'Encumbrances'],
-                'condition_status' => ['type' => 'select', 'label' => 'Condition', 'options' => ['excellent', 'good', 'fair', 'poor']],
-                'notes' => ['type' => 'textarea', 'label' => 'Notes']
-            ],
-            'SW' => [
-                'software_name' => ['type' => 'text', 'label' => 'Software Name', 'required' => true],
-                'version' => ['type' => 'text', 'label' => 'Version'],
-                'license_type' => ['type' => 'select', 'label' => 'License Type', 'options' => ['perpetual', 'subscription', 'open_source', 'freemium']],
-                'license_key' => ['type' => 'text', 'label' => 'License Key'],
-                'number_of_licenses' => ['type' => 'number', 'label' => 'Number of Licenses'],
-                'platform' => ['type' => 'select', 'label' => 'Platform', 'options' => ['windows', 'mac', 'linux', 'web', 'mobile', 'multi_platform']],
-                'installation_date' => ['type' => 'date', 'label' => 'Installation Date'],
-                'license_expiry' => ['type' => 'date', 'label' => 'License Expiry'],
-                'renewal_cost' => ['type' => 'number', 'label' => 'Renewal Cost'],
-                'vendor' => ['type' => 'text', 'label' => 'Vendor'],
-                'support_contact' => ['type' => 'text', 'label' => 'Support Contact'],
-                'activation_method' => ['type' => 'select', 'label' => 'Activation Method', 'options' => ['key', 'online', 'usb_dongle', 'account']],
-                'server_based' => ['type' => 'checkbox', 'label' => 'Server Based'],
-                'concurrent_users' => ['type' => 'number', 'label' => 'Concurrent Users'],
-                'hardware_requirements' => ['type' => 'textarea', 'label' => 'Hardware Requirements'],
-                'installation_path' => ['type' => 'text', 'label' => 'Installation Path'],
-                'assigned_department' => ['type' => 'text', 'label' => 'Assigned Department'],
-                'condition_status' => ['type' => 'select', 'label' => 'Status', 'options' => ['active', 'inactive', 'deprecated']],
-                'notes' => ['type' => 'textarea', 'label' => 'Notes']
-            ],
-            'OE' => [
-                'equipment_type' => ['type' => 'select', 'label' => 'Equipment Type', 'options' => ['printer', 'scanner', 'photocopier', 'fax', 'telephone', 'projector', 'shredder', 'other']],
-                'brand' => ['type' => 'text', 'label' => 'Brand'],
-                'model' => ['type' => 'text', 'label' => 'Model'],
-                'serial_number' => ['type' => 'text', 'label' => 'Serial Number'],
-                'connectivity' => ['type' => 'select', 'label' => 'Connectivity', 'options' => ['usb', 'network', 'wireless', 'bluetooth', 'multi']],
-                'network_ip' => ['type' => 'text', 'label' => 'Network IP'],
-                'functions' => ['type' => 'text', 'label' => 'Functions'],
-                'paper_size' => ['type' => 'text', 'label' => 'Paper Size'],
-                'print_speed_ppm' => ['type' => 'number', 'label' => 'Print Speed (PPM)'],
-                'scan_resolution' => ['type' => 'text', 'label' => 'Scan Resolution'],
-                'color_capability' => ['type' => 'checkbox', 'label' => 'Color Capability'],
-                'power_consumption' => ['type' => 'text', 'label' => 'Power Consumption'],
-                'warranty_provider' => ['type' => 'text', 'label' => 'Warranty Provider'],
-                'warranty_expiry' => ['type' => 'date', 'label' => 'Warranty Expiry'],
-                'last_service_date' => ['type' => 'date', 'label' => 'Last Service Date'],
-                'next_service_date' => ['type' => 'date', 'label' => 'Next Service Date'],
-                'condition_status' => ['type' => 'select', 'label' => 'Condition', 'options' => ['excellent', 'good', 'fair', 'poor']],
-                'location_building' => ['type' => 'text', 'label' => 'Building'],
-                'location_floor' => ['type' => 'text', 'label' => 'Floor'],
-                'location_room' => ['type' => 'text', 'label' => 'Room'],
-                'assigned_to' => ['type' => 'text', 'label' => 'Assigned To'],
-                'notes' => ['type' => 'textarea', 'label' => 'Notes']
-            ]
-        ]); ?>;
-        
-        // Generate category-specific fields
-        function generateCategoryFields(categoryCode, containerId, assetData = null) {
-            const container = document.getElementById(containerId);
-            const fields = categoryFields[categoryCode];
-            
-            if (!fields) {
-                container.innerHTML = '';
-                return;
-            }
-            
-            let html = '<div class="category-specific-fields mt-3">';
-            html += '<h6 class="mb-3"><i class="bi bi-gear"></i> Specific Details</h6>';
-            
-            for (const [fieldName, fieldConfig] of Object.entries(fields)) {
-                const value = assetData ? (assetData[fieldName] || '') : '';
-                const required = fieldConfig.required || false;
-                const requiredAttr = required ? 'required' : '';
-                
-                html += '<div class="mb-3">';
-                html += '<label class="form-label">' + fieldConfig.label;
-                if (required) {
-                    html += ' <span class="text-danger">*</span>';
-                }
-                html += '</label>';
-                
-                switch (fieldConfig.type) {
-                    case 'select':
-                        html += '<select class="form-select" name="' + fieldName + '" ' + requiredAttr + '>';
-                        html += '<option value="">Select ' + fieldConfig.label + '</option>';
-                        fieldConfig.options.forEach(option => {
-                            const selected = value == option ? 'selected' : '';
-                            const optionLabel = option.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-                            html += '<option value="' + option + '" ' + selected + '>' + optionLabel + '</option>';
-                        });
-                        html += '</select>';
-                        break;
-                        
-                    case 'textarea':
-                        html += '<textarea class="form-control" name="' + fieldName + '" rows="3" ' + requiredAttr + '>' + value + '</textarea>';
-                        break;
-                        
-                    case 'checkbox':
-                        const checked = value ? 'checked' : '';
-                        html += '<div class="form-check">';
-                        html += '<input class="form-check-input" type="checkbox" name="' + fieldName + '" value="1" ' + checked + '>';
-                        html += '<label class="form-check-label">' + fieldConfig.label + '</label>';
-                        html += '</div>';
-                        break;
-                        
-                    case 'number':
-                        html += '<input type="number" class="form-control" name="' + fieldName + '" value="' + value + '" ' + requiredAttr + '>';
-                        break;
-                        
-                    case 'date':
-                        html += '<input type="date" class="form-control" name="' + fieldName + '" value="' + value + '" ' + requiredAttr + '>';
-                        break;
-                        
-                    default:
-                        html += '<input type="text" class="form-control" name="' + fieldName + '" value="' + value + '" ' + requiredAttr + '>';
-                        break;
-                }
-                
-                html += '</div>';
-            }
-            
-            html += '</div>';
-            container.innerHTML = html;
-        }
         
         // Get category code from category ID
         function getCategoryCode(categoryId) {
@@ -1076,14 +839,6 @@ try {
         
         // Add event listeners for category selection in modals
         document.addEventListener('DOMContentLoaded', function() {
-            // Add asset modal category change
-            const addCategorySelect = document.querySelector('select[name="asset_categories_id"]');
-            if (addCategorySelect) {
-                addCategorySelect.addEventListener('change', function() {
-                    const categoryCode = getCategoryCode(this.value);
-                    generateCategoryFields(categoryCode, 'categorySpecificFields');
-                });
-            }
             
         });
     </script>

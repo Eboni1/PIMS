@@ -44,7 +44,14 @@ class AssetSpecificManager {
             $stmt->bind_param("i", $asset_id);
             $stmt->execute();
             $result = $stmt->get_result();
-            return $result->fetch_assoc();
+            $data = $result->fetch_assoc();
+            
+            // Remove the 'id' field to prevent overwriting the main asset ID
+            if ($data && isset($data['id'])) {
+                unset($data['id']);
+            }
+            
+            return $data;
         } catch (Exception $e) {
             error_log("Error fetching specific asset data: " . $e->getMessage());
             return null;
