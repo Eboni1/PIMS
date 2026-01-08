@@ -333,6 +333,46 @@ try {
             <i class="bi bi-people"></i>
             Employees
         </a>
+        <div class="sidebar-dropdown">
+            <button class="sidebar-dropdown-toggle <?php echo (in_array($current_page, ['par_form.php', 'ics_form.php', 'ris_form.php', 'iirup_form.php', 'itr_form.php'])) ? 'active' : ''; ?>" 
+                    type="button" data-bs-toggle="collapse" data-bs-target="#formsDropdown" 
+                    aria-expanded="<?php echo (in_array($current_page, ['par_form.php', 'ics_form.php', 'ris_form.php', 'iirup_form.php', 'itr_form.php'])) ? 'true' : 'false'; ?>">
+                <div>
+                    <i class="bi bi-file-earmark-text"></i>
+                    Forms
+                </div>
+                <i class="bi bi-chevron-down"></i>
+            </button>
+            <div class="collapse <?php echo (in_array($current_page, ['par_form.php', 'ics_form.php', 'ris_form.php', 'iirup_form.php', 'itr_form.php'])) ? 'show' : ''; ?>" id="formsDropdown">
+                <ul class="sidebar-dropdown-menu">
+                    <li>
+                        <a href="../SYSTEM_ADMIN/forms/par_form.php" class="sidebar-dropdown-item <?php echo $current_page == 'par_form.php' ? 'active' : ''; ?>">
+                            Property Acknowledgment Receipt
+                        </a>
+                    </li>
+                    <li>
+                        <a href="../SYSTEM_ADMIN/forms/ics_form.php" class="sidebar-dropdown-item <?php echo $current_page == 'ics_form.php' ? 'active' : ''; ?>">
+                            Inventory Custodian Slip
+                        </a>
+                    </li>
+                    <li>
+                        <a href="../SYSTEM_ADMIN/forms/ris_form.php" class="sidebar-dropdown-item <?php echo $current_page == 'ris_form.php' ? 'active' : ''; ?>">
+                            Requisition and Issue Slip
+                        </a>
+                    </li>
+                    <li>
+                        <a href="../SYSTEM_ADMIN/forms/iirup_form.php" class="sidebar-dropdown-item <?php echo $current_page == 'iirup_form.php' ? 'active' : ''; ?>">
+                            Individual Item Request for User Property
+                        </a>
+                    </li>
+                    <li>
+                        <a href="../SYSTEM_ADMIN/forms/itr_form.php" class="sidebar-dropdown-item <?php echo $current_page == 'itr_form.php' ? 'active' : ''; ?>">
+                            Inventory Transfer Request
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
         <a href="reports.php" class="sidebar-nav-item <?php echo $current_page == 'reports.php' ? 'active' : ''; ?>">
             <i class="bi bi-file-earmark-bar-graph"></i>
             Reports
