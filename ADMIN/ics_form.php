@@ -40,6 +40,38 @@ $result = $conn->query("SELECT header_image FROM forms WHERE form_code = 'ICS'")
 if ($result && $row = $result->fetch_assoc()) {
     $header_image = $row['header_image'];
 }
+
+// Common units for dropdown
+$common_units = [
+    'Pieces',
+    'Sets',
+    'Units',
+    'Boxes',
+    'Cartons',
+    'Packs',
+    'Bottles',
+    'Liters',
+    'Gallons',
+    'Kilograms',
+    'Grams',
+    'Meters',
+    'Centimeters',
+    'Feet',
+    'Inches',
+    'Rolls',
+    'Bags',
+    'Canisters',
+    'Jars',
+    'Tubes',
+    'Pounds',
+    'Ounces',
+    'Dozens',
+    'Pairs',
+    'Reams',
+    'Cases',
+    'Barrels',
+    'Drums'
+];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -239,11 +271,18 @@ if ($result && $row = $result->fetch_assoc()) {
                                         <tbody>
                                             <tr>
                                                 <td><input type="number" class="form-control form-control-sm" name="quantity[]" required onchange="calculateTotal(this)"></td>
-                                                <td><input type="text" class="form-control form-control-sm" name="unit[]" required></td>
+                                                <td>
+                                                    <select class="form-select form-select-sm" name="unit[]" required>
+                                                        <option value="">Select Unit</option>
+                                                        <?php foreach ($common_units as $unit): ?>
+                                                            <option value="<?php echo htmlspecialchars($unit); ?>"><?php echo htmlspecialchars($unit); ?></option>
+                                                        <?php endforeach; ?>
+                                                    </select>
+                                                </td>
                                                 <td><input type="number" step="0.01" class="form-control form-control-sm" name="unit_cost[]" required onchange="calculateTotal(this)"></td>
                                                 <td><input type="number" step="0.01" class="form-control form-control-sm" name="total_cost[]" readonly></td>
                                                 <td><input type="text" class="form-control form-control-sm" name="description[]" required></td>
-                                                <td><input type="text" class="form-control form-control-sm" name="item_no[]" required></td>
+                                                <td><input type="text" class="form-control form-control-sm bg-light" name="item_no[]" value="1" readonly></td>
                                                 <td><input type="text" class="form-control form-control-sm" name="useful_life[]" required></td>
                                                 <td><button type="button" class="btn btn-sm btn-danger" onclick="removeICSRow(this)"><i class="bi bi-trash"></i></button></td>
                                             </tr>
@@ -297,13 +336,25 @@ if ($result && $row = $result->fetch_assoc()) {
             const table = document.getElementById('icsItemsTable').getElementsByTagName('tbody')[0];
             const newRow = table.insertRow();
             
+            // Create unit dropdown HTML
+            const unitOptions = <?php 
+                $options = '<option value="">Select Unit</option>';
+                foreach ($common_units as $unit) {
+                    $options .= '<option value="' . htmlspecialchars($unit) . '">' . htmlspecialchars($unit) . '</option>';
+                }
+                echo json_encode($options);
+            ?>;
+            
+            // Get next item number
+            const nextItemNumber = table.rows.length;
+            
             const cells = [
                 '<input type="number" class="form-control form-control-sm" name="quantity[]" required onchange="calculateTotal(this)">',
-                '<input type="text" class="form-control form-control-sm" name="unit[]" required>',
+                '<select class="form-select form-select-sm" name="unit[]" required>' + unitOptions + '</select>',
                 '<input type="number" step="0.01" class="form-control form-control-sm" name="unit_cost[]" required onchange="calculateTotal(this)">',
                 '<input type="number" step="0.01" class="form-control form-control-sm" name="total_cost[]" readonly>',
                 '<input type="text" class="form-control form-control-sm" name="description[]" required>',
-                '<input type="text" class="form-control form-control-sm" name="item_no[]" required>',
+                '<input type="text" class="form-control form-control-sm bg-light" name="item_no[]" value="' + nextItemNumber + '" readonly>',
                 '<input type="text" class="form-control form-control-sm" name="useful_life[]" required>',
                 '<button type="button" class="btn btn-sm btn-danger" onclick="removeICSRow(this)"><i class="bi bi-trash"></i></button>'
             ];
@@ -320,8 +371,23 @@ if ($result && $row = $result->fetch_assoc()) {
             
             if (table.rows.length > 1) {
                 row.remove();
+                // Renumber items after removal
+                renumberItems();
             } else {
                 alert('At least one row is required');
+            }
+        }
+        
+        function renumberItems() {
+            const table = document.getElementById('icsItemsTable').getElementsByTagName('tbody')[0];
+            const rows = table.rows;
+            
+            for (let i = 0; i < rows.length; i++) {
+                const itemNoCell = rows[i].cells[5]; // Item No is in column 5 (0-indexed)
+                const itemNoInput = itemNoCell.querySelector('input[name="item_no[]"]');
+                if (itemNoInput) {
+                    itemNoInput.value = i + 1;
+                }
             }
         }
         
@@ -341,6 +407,12 @@ if ($result && $row = $result->fetch_assoc()) {
                 while (table.rows.length > 1) {
                     table.deleteRow(1);
                 }
+                // Reset the first row item number to 1
+                const firstRow = table.rows[0];
+                const itemNoInput = firstRow.cells[5].querySelector('input[name="item_no[]"]');
+                if (itemNoInput) {
+                    itemNoInput.value = '1';
+                }
             }
         }
         
@@ -352,6 +424,17 @@ if ($result && $row = $result->fetch_assoc()) {
             document.getElementById('icsForm').reset();
             // Generate fresh ICS number
             generateNewIcsNumber();
+            // Reset item numbering
+            const table = document.getElementById('icsItemsTable').getElementsByTagName('tbody')[0];
+            while (table.rows.length > 1) {
+                table.deleteRow(1);
+            }
+            // Reset the first row item number to 1
+            const firstRow = table.rows[0];
+            const itemNoInput = firstRow.cells[5].querySelector('input[name="item_no[]"]');
+            if (itemNoInput) {
+                itemNoInput.value = '1';
+            }
         }
         
         // Generate new ICS number via AJAX
