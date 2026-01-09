@@ -25,6 +25,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $entity_name = $_POST['entity_name'];
         $fund_cluster = $_POST['fund_cluster'];
         $ics_no = $_POST['ics_no'];
+        $received_from = $_POST['received_from'] ?? '';
+        $received_from_position = $_POST['received_from_position'] ?? '';
+        $received_from_date = $_POST['received_from_date'] ?? null;
+        $received_by = $_POST['received_by'] ?? '';
+        $received_by_position = $_POST['received_by_position'] ?? '';
+        $received_by_date = $_POST['received_by_date'] ?? null;
         $items = $_POST['item_no'] ?? [];
         $quantities = $_POST['quantity'] ?? [];
         $units = $_POST['unit'] ?? [];
@@ -48,12 +54,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
         
+        // Get office ID from entity name
+        $office_id = null;
+        $office_result = $conn->prepare("SELECT id FROM offices WHERE office_name = ?");
+        $office_result->bind_param("s", $entity_name);
+        $office_result->execute();
+        $office_row = $office_result->get_result();
+        if ($office_row && $office_row->num_rows > 0) {
+            $office_data = $office_row->fetch_assoc();
+            $office_id = $office_data['id'];
+        }
+        $office_result->close();
+        
         // Begin transaction
         $conn->begin_transaction();
         
         // Insert ICS form
-        $stmt = $conn->prepare("INSERT INTO ics_forms (entity_name, fund_cluster, ics_no, created_by, updated_by) VALUES (?, ?, ?, ?, ?)");
-        $stmt->bind_param("sssi", $entity_name, $fund_cluster, $ics_no, $_SESSION['user_id'], $_SESSION['user_id']);
+        $stmt = $conn->prepare("INSERT INTO ics_forms (entity_name, fund_cluster, ics_no, received_from, received_from_position, received_from_date, received_by, received_by_position, received_by_date, created_by, updated_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt->bind_param("ssssssssssi", $entity_name, $fund_cluster, $ics_no, $received_from, $received_from_position, $received_from_date, $received_by, $received_by_position, $received_by_date, $_SESSION['user_id'], $_SESSION['user_id']);
         
         if (!$stmt->execute()) {
             throw new Exception('Failed to save ICS form: ' . $stmt->error);
@@ -72,11 +90,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $total_cost = floatval($total_costs[$i]);
                 $useful_life = intval($useful_lives[$i]);
                 
-                $item_stmt->bind_param("isiddsi", $ics_form_id, $items[$i], $quantity, $units[$i], $unit_cost, $total_cost, $descriptions[$i], $useful_life);
+                $item_stmt->bind_param("isiddssi", $ics_form_id, $items[$i], $quantity, $units[$i], $unit_cost, $total_cost, $descriptions[$i], $useful_life);
                 
                 if (!$item_stmt->execute()) {
                     throw new Exception('Failed to save ICS item: ' . $item_stmt->error);
                 }
+                
+                // Also insert as asset and asset item
+                $asset_stmt = $conn->prepare("INSERT INTO assets (description, unit, quantity, unit_cost, office_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, NOW(), NOW())");
+                $asset_stmt->bind_param("ssidi", $descriptions[$i], $units[$i], $quantity, $unit_cost, $office_id);
+                
+                if (!$asset_stmt->execute()) {
+                    throw new Exception('Failed to save asset: ' . $asset_stmt->error);
+                }
+                
+                $asset_id = $asset_stmt->insert_id;
+                $asset_stmt->close();
+                
+                // Insert asset item
+                $asset_item_stmt = $conn->prepare("INSERT INTO asset_items (asset_id, description, status, value, acquisition_date, office_id, created_at, last_updated) VALUES (?, ?, 'available', ?, CURDATE(), ?, NOW(), NOW())");
+                $asset_item_stmt->bind_param("isdi", $asset_id, $descriptions[$i], $total_cost, $office_id);
+                
+                if (!$asset_item_stmt->execute()) {
+                    throw new Exception('Failed to save asset item: ' . $asset_item_stmt->error);
+                }
+                $asset_item_stmt->close();
             }
         }
         $item_stmt->close();

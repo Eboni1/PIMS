@@ -72,6 +72,15 @@ $common_units = [
     'Barrels',
     'Drums'
 ];
+
+// Get offices for dropdown
+$offices = [];
+$result = $conn->query("SELECT id, office_name FROM offices WHERE status = 'active' ORDER BY office_name");
+if ($result) {
+    while ($row = $result->fetch_assoc()) {
+        $offices[] = $row;
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -181,7 +190,10 @@ $common_units = [
                     <p class="text-muted mb-0">Manage Inventory Custodian Slip forms</p>
                 </div>
                 <div class="col-md-4 text-md-end">
-                    <button class="btn btn-outline-primary btn-sm" onclick="createNewICS()">
+                    <a href="ics_entries.php" class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-list"></i> View Entries
+                    </a>
+                    <button class="btn btn-outline-primary btn-sm ms-2" onclick="createNewICS()">
                         <i class="bi bi-plus-circle"></i> Create New ICS
                     </button>
                     <button class="btn btn-outline-success btn-sm ms-2" onclick="exportICSData()">
@@ -229,7 +241,14 @@ $common_units = [
                             <div class="row mb-3">
                                 <div class="col-md-4">
                                     <label class="form-label"><strong>Entity Name:</strong></label>
-                                    <input type="text" class="form-control" name="entity_name" required>
+                                    <select class="form-select" name="entity_name" required>
+                                        <option value="">Select Office</option>
+                                        <?php foreach ($offices as $office): ?>
+                                            <option value="<?php echo htmlspecialchars($office['office_name']); ?>">
+                                                <?php echo htmlspecialchars($office['office_name']); ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
                                 </div>
                                 <div class="col-md-4">
                                     <label class="form-label"><strong>Fund Cluster:</strong></label>
@@ -302,7 +321,7 @@ $common_units = [
                                     <label class="form-label"><strong>Position/Office:</strong></label>
                                     <input type="text" class="form-control" name="received_from_position" required>
                                     <label class="form-label"><strong>Date:</strong></label>
-                                    <input type="date" class="form-control" name="received_from_date" required>
+                                    <input type="date" class="form-control" name="received_from_date">
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label"><strong>Received by:</strong></label>
@@ -310,7 +329,7 @@ $common_units = [
                                     <label class="form-label"><strong>Position/Office:</strong></label>
                                     <input type="text" class="form-control" name="received_by_position" required>
                                     <label class="form-label"><strong>Date:</strong></label>
-                                    <input type="date" class="form-control" name="received_by_date" required>
+                                    <input type="date" class="form-control" name="received_by_date">
                                 </div>
                             </div>
                             
