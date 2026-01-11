@@ -54,6 +54,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
         
+        // Get office ID from office location
+        $office_id = null;
+        $office_result = $conn->prepare("SELECT id FROM offices WHERE office_name = ?");
+        $office_result->bind_param("s", $office_location);
+        $office_result->execute();
+        $office_row = $office_result->get_result();
+        if ($office_row && $office_row->num_rows > 0) {
+            $office_data = $office_row->fetch_assoc();
+            $office_id = $office_data['id'];
+        }
+        $office_result->close();
+        
         // Begin transaction
         $conn->begin_transaction();
         
@@ -77,12 +89,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $property_number = $property_numbers[$i] ?? null;
                 $date_acquired = !empty($dates_acquired[$i]) ? $dates_acquired[$i] : null;
                 $amount = floatval($amounts[$i]);
+                $unit_cost = $quantity > 0 ? $amount / $quantity : 0;
                 
                 $item_stmt->bind_param("idssdsd", $par_form_id, $quantity, $units[$i], $descriptions[$i], $property_number, $date_acquired, $amount);
                 
                 if (!$item_stmt->execute()) {
                     throw new Exception('Failed to save PAR item: ' . $item_stmt->error);
                 }
+                
+                // Also insert as asset and asset item
+                $asset_stmt = $conn->prepare("INSERT INTO assets (description, unit, quantity, unit_cost, office_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, NOW(), NOW())");
+                $asset_stmt->bind_param("ssidi", $descriptions[$i], $units[$i], $quantity, $unit_cost, $office_id);
+                
+                if (!$asset_stmt->execute()) {
+                    throw new Exception('Failed to save asset: ' . $asset_stmt->error);
+                }
+                
+                $asset_id = $asset_stmt->insert_id;
+                $asset_stmt->close();
+                
+                // Insert multiple asset items based on quantity
+                $asset_item_stmt = $conn->prepare("INSERT INTO asset_items (asset_id, par_id, description, status, value, acquisition_date, office_id, created_at, last_updated) VALUES (?, ?, ?, 'no_tag', ?, ?, ?, NOW(), NOW())");
+                
+                // Create individual asset items for each quantity
+                for ($item_num = 1; $item_num <= $quantity; $item_num++) {
+                    $asset_item_stmt->bind_param("iisddi", $asset_id, $par_form_id, $descriptions[$i], $unit_cost, $date_acquired, $office_id);
+                    
+                    if (!$asset_item_stmt->execute()) {
+                        throw new Exception('Failed to save asset item ' . $item_num . ': ' . $asset_item_stmt->error);
+                    }
+                }
+                $asset_item_stmt->close();
             }
         }
         $item_stmt->close();
