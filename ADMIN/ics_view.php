@@ -160,7 +160,7 @@ if ($result && $row = $result->fetch_assoc()) {
                     <a href="ics_entries.php" class="btn btn-outline-secondary btn-sm me-2">
                         <i class="bi bi-arrow-left"></i> Back to Entries
                     </a>
-                    <button class="btn btn-outline-info btn-sm me-2" onclick="window.print()">
+                    <button class="btn btn-outline-info btn-sm me-2" onclick="window.open('print_ics.php?id=<?php echo $ics_id; ?>', '_blank')">
                         <i class="bi bi-printer"></i> Print
                     </button>
                     <a href="ics_form.php" class="btn btn-primary btn-sm">

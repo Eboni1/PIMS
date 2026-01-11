@@ -283,7 +283,7 @@ if ($result && $row = $result->fetch_assoc()) {
         }
         
         function printICS(id) {
-            window.open('ics_print.php?id=' + id, '_blank');
+            window.open('print_ics.php?id=' + id, '_blank');
         }
         
         function searchICSForms() {
