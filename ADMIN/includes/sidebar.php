@@ -334,16 +334,16 @@ try {
             Employees
         </a>
         <div class="sidebar-dropdown">
-            <button class="sidebar-dropdown-toggle <?php echo (in_array($current_page, ['par_form.php', 'ics_form.php', 'ris_form.php', 'iirup_form.php', 'itr_form.php'])) ? 'active' : ''; ?>" 
+            <button class="sidebar-dropdown-toggle <?php echo (in_array($current_page, ['par_form.php', 'ics_form.php', 'ris_form.php', 'ris_entries.php', 'iirup_form.php', 'itr_form.php'])) ? 'active' : ''; ?>" 
                     type="button" data-bs-toggle="collapse" data-bs-target="#formsDropdown" 
-                    aria-expanded="<?php echo (in_array($current_page, ['par_form.php', 'ics_form.php', 'ris_form.php', 'iirup_form.php', 'itr_form.php'])) ? 'true' : 'false'; ?>">
+                    aria-expanded="<?php echo (in_array($current_page, ['par_form.php', 'ics_form.php', 'ris_form.php', 'ris_entries.php', 'iirup_form.php', 'itr_form.php'])) ? 'true' : 'false'; ?>">
                 <div>
                     <i class="bi bi-file-earmark-text"></i>
                     Forms
                 </div>
                 <i class="bi bi-chevron-down"></i>
             </button>
-            <div class="collapse <?php echo (in_array($current_page, ['par_form.php', 'ics_form.php', 'ris_form.php', 'iirup_form.php', 'itr_form.php'])) ? 'show' : ''; ?>" id="formsDropdown">
+            <div class="collapse <?php echo (in_array($current_page, ['par_form.php', 'ics_form.php', 'ris_form.php', 'ris_entries.php', 'iirup_form.php', 'itr_form.php'])) ? 'show' : ''; ?>" id="formsDropdown">
                 <ul class="sidebar-dropdown-menu">
                     <li>
                         <a href="par_form.php" class="sidebar-dropdown-item <?php echo $current_page == 'par_form.php' ? 'active' : ''; ?>">
@@ -358,6 +358,11 @@ try {
                     <li>
                         <a href="ris_form.php" class="sidebar-dropdown-item <?php echo $current_page == 'ris_form.php' ? 'active' : ''; ?>">
                             Requisition and Issue Slip
+                        </a>
+                    </li>
+                    <li>
+                        <a href="ris_entries.php" class="sidebar-dropdown-item <?php echo $current_page == 'ris_entries.php' ? 'active' : ''; ?>">
+                            RIS Entries
                         </a>
                     </li>
                     <li>

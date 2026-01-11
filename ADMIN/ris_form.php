@@ -191,6 +191,9 @@ if ($result && $row = $result->fetch_assoc()) {
                     <p class="text-muted mb-0">Manage Requisition and Issue Slip forms</p>
                 </div>
                 <div class="col-md-4 text-md-end">
+                    <a href="ris_entries.php" class="btn btn-outline-primary me-2">
+                        <i class="bi bi-list"></i> View Entries
+                    </a>
                     <!-- Action buttons removed as requested -->
                 </div>
             </div>
