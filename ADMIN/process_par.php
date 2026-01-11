@@ -25,9 +25,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $entity_name = $_POST['entity_name'];
         $fund_cluster = $_POST['fund_cluster'];
         $par_no = $_POST['par_no'];
-        $remarks = $_POST['remarks'] ?? '';
+        $office_location = $_POST['office_location'] ?? '';
         $received_by = $_POST['received_by'];
+        $received_by_position = $_POST['received_by_position'] ?? '';
+        $received_by_date = $_POST['received_by_date'] ?? null;
         $issued_by = $_POST['issued_by'];
+        $issued_by_position = $_POST['issued_by_position'] ?? '';
+        $issued_by_date = $_POST['issued_by_date'] ?? null;
         $quantities = $_POST['quantity'] ?? [];
         $units = $_POST['unit'] ?? [];
         $descriptions = $_POST['description'] ?? [];
@@ -36,7 +40,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $amounts = $_POST['amount'] ?? [];
         
         // Validate required fields
-        if (empty($entity_name) || empty($fund_cluster) || empty($par_no) || empty($received_by) || empty($issued_by)) {
+        if (empty($entity_name) || empty($fund_cluster) || empty($par_no) || empty($office_location) || empty($received_by) || empty($issued_by)) {
             throw new Exception('All required fields must be filled');
         }
         
@@ -54,8 +58,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $conn->begin_transaction();
         
         // Insert PAR form
-        $stmt = $conn->prepare("INSERT INTO par_forms (entity_name, fund_cluster, par_no, remarks, received_by_name, issued_by_name, created_by, updated_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-        $stmt->bind_param("ssssssii", $entity_name, $fund_cluster, $par_no, $remarks, $received_by, $issued_by, $_SESSION['user_id'], $_SESSION['user_id']);
+        $stmt = $conn->prepare("INSERT INTO par_forms (entity_name, fund_cluster, par_no, office_location, received_by_name, received_by_position, received_by_date, issued_by_name, issued_by_position, issued_by_date, created_by, updated_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt->bind_param("ssssssssssii", $entity_name, $fund_cluster, $par_no, $office_location, $received_by, $received_by_position, $received_by_date, $issued_by, $issued_by_position, $issued_by_date, $_SESSION['user_id'], $_SESSION['user_id']);
         
         if (!$stmt->execute()) {
             throw new Exception('Failed to save PAR form: ' . $stmt->error);

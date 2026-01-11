@@ -35,19 +35,32 @@ if ($result && $row = $result->fetch_assoc()) {
     $par_config = $row;
 }
 
-// Get form data from database
-$form_data = [];
-try {
-    $stmt = $conn->prepare("SELECT * FROM par_forms ORDER BY created_at DESC");
-    $stmt->execute();
-    $result = $stmt->get_result();
-    while ($row = $result->fetch_assoc()) {
-        $form_data[] = $row;
-    }
-    $stmt->close();
-} catch (Exception $e) {
-    error_log("Error fetching PAR forms: " . $e->getMessage());
-}
+// Common units for dropdown
+$common_units = [
+    'Pieces',
+    'Sets',
+    'Units',
+    'Boxes',
+    'Cartons',
+    'Packs',
+    'Bottles',
+    'Liters',
+    'Gallons',
+    'Kilograms',
+    'Grams',
+    'Meters',
+    'Centimeters',
+    'Feet',
+    'Inches',
+    'Dozens',
+    'Pairs',
+    'Rolls',
+    'Bags',
+    'Canisters',
+    'Jars',
+    'Tubes',
+    'Reams'
+];
 
 // Get header image from forms table
 $header_image = '';
@@ -176,11 +189,8 @@ if ($result && $row = $result->fetch_assoc()) {
                     <p class="text-muted mb-0">Manage Property Acknowledgment Receipt forms</p>
                 </div>
                 <div class="col-md-4 text-md-end">
-                    <button class="btn btn-outline-primary btn-sm" onclick="createNewPAR()">
-                        <i class="bi bi-plus-circle"></i> Create New PAR
-                    </button>
-                    <button class="btn btn-outline-success btn-sm ms-2" onclick="exportPARData()">
-                        <i class="bi bi-download"></i> Export
+                    <button class="btn btn-outline-secondary btn-sm" onclick="viewPAREntries()">
+                        <i class="bi bi-list"></i> View Entries
                     </button>
                 </div>
             </div>
@@ -210,47 +220,39 @@ if ($result && $row = $result->fetch_assoc()) {
                 <h5 class="mb-0">
                     <i class="bi bi-pencil-square"></i> PAR Form
                 </h5>
-                <div class="no-print">
-                    <button class="btn btn-sm btn-outline-secondary" onclick="resetForm()">
-                        <i class="bi bi-arrow-clockwise"></i> Reset
-                    </button>
-                    <button class="btn btn-sm btn-outline-info ms-2" onclick="printForm()">
-                        <i class="bi bi-printer"></i> Print
-                    </button>
-                </div>
+                <button class="btn btn-sm btn-outline-secondary" onclick="resetForm()">
+                    <i class="bi bi-arrow-clockwise"></i> Reset
+                </button>
             </div>
             
-            <ul class="nav nav-tabs mb-4" id="parTabs" role="tablist">
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link active" id="par-input-tab" data-bs-toggle="tab" data-bs-target="#par-input" type="button" role="tab">
-                        <i class="bi bi-pencil-square"></i> PAR Input
-                    </button>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="par-entries-tab" data-bs-toggle="tab" data-bs-target="#par-entries" type="button" role="tab">
-                        <i class="bi bi-list"></i> PAR Entries
-                    </button>
-                </li>
-            </ul>
-
-            <div class="tab-content" id="parTabsContent">
-                <!-- PAR Input Tab -->
-                <div class="tab-pane fade show active" id="par-input" role="tabpanel">
-                    <form id="parForm" method="POST" action="process_par.php">
-                        <!-- PAR Form Header -->
-                        <div style="text-align: center; margin-bottom: 20px;">
-                            <?php 
-                            if (!empty($header_image)) {
-                                echo '<div style="margin-bottom: 10px;">';
-                                echo '<img src="../uploads/forms/' . htmlspecialchars($header_image) . '" alt="Header Image" style="width: 100%; max-height: 120px; object-fit: contain;">';
-                                echo '</div>';
-                            }
-                            ?>
-                            <div style="text-align: center;">
-                                <p style="margin: 0; font-size: 16px; font-weight: bold;">PROPERTY ACKNOWLEDGEMENT RECEIPT</p>
-                                <p style="margin: 0; font-size: 12px;">MUNICIPALITY OF PILAR</p>
-                                <p style="margin: 0; font-size: 12px;">OMM</p>
-                                <p style="margin: 0; font-size: 12px;">OFFICE/LOCATION</p>
+            <form id="parForm" method="POST" action="process_par.php">
+                <!-- PAR Form Header -->
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <?php 
+                    if (!empty($header_image)) {
+                        echo '<div style="margin-bottom: 10px;">';
+                        echo '<img src="../uploads/forms/' . htmlspecialchars($header_image) . '" alt="Header Image" style="width: 100%; max-height: 120px; object-fit: contain;">';
+                        echo '</div>';
+                    }
+                    ?>
+                    <div style="text-align: center; margin-bottom: 20px;">
+                        <div class="row justify-content-center">
+                            <div class="col-md-6">
+                                <label class="form-label"><strong>Office/Location:</strong></label>
+                                        <select class="form-select" name="office_location" required>
+                                            <option value="">Select Office</option>
+                                            <?php
+                                            // Get offices from database
+                                            $offices_result = $conn->query("SELECT id, office_name FROM offices WHERE status = 'active' ORDER BY office_name");
+                                            if ($offices_result) {
+                                                while ($office = $offices_result->fetch_assoc()) {
+                                                    echo '<option value="' . htmlspecialchars($office['office_name']) . '">' . htmlspecialchars($office['office_name']) . '</option>';
+                                                }
+                                            }
+                                            ?>
+                                        </select>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                         
@@ -290,7 +292,14 @@ if ($result && $row = $result->fetch_assoc()) {
                                     <tbody>
                                         <tr>
                                             <td><input type="number" class="form-control form-control-sm" name="quantity[]" required onchange="calculateAmount(this)"></td>
-                                            <td><input type="text" class="form-control form-control-sm" name="unit[]" required></td>
+                                            <td>
+                                                <select class="form-select form-select-sm" name="unit[]" required>
+                                                    <option value="">Select Unit</option>
+                                                    <?php foreach ($common_units as $unit): ?>
+                                                        <option value="<?php echo htmlspecialchars($unit); ?>"><?php echo htmlspecialchars($unit); ?></option>
+                                                    <?php endforeach; ?>
+                                                </select>
+                                            </td>
                                             <td><input type="text" class="form-control form-control-sm" name="description[]" required></td>
                                             <td><input type="text" class="form-control form-control-sm" name="property_number[]"></td>
                                             <td><input type="date" class="form-control form-control-sm" name="date_acquired[]"></td>
@@ -305,21 +314,23 @@ if ($result && $row = $result->fetch_assoc()) {
                             </button>
                         </div>
                         
-                        <!-- Remarks -->
-                        <div class="mb-3">
-                            <label class="form-label"><strong>Remarks:</strong></label>
-                            <textarea class="form-control" name="remarks" rows="3"></textarea>
-                        </div>
-                        
                         <!-- Signature Section -->
                         <div class="row mb-3">
                             <div class="col-md-6">
                                 <label class="form-label"><strong>Received by:</strong></label>
                                 <input type="text" class="form-control" name="received_by" required>
+                                <label class="form-label mt-2"><strong>Position:</strong></label>
+                                <input type="text" class="form-control" name="received_by_position">
+                                <label class="form-label mt-2"><strong>Date:</strong></label>
+                                <input type="date" class="form-control" name="received_by_date">
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label"><strong>Issued by:</strong></label>
                                 <input type="text" class="form-control" name="issued_by" required>
+                                <label class="form-label mt-2"><strong>Position:</strong></label>
+                                <input type="text" class="form-control" name="issued_by_position">
+                                <label class="form-label mt-2"><strong>Date:</strong></label>
+                                <input type="date" class="form-control" name="issued_by_date">
                             </div>
                         </div>
                         
@@ -331,65 +342,6 @@ if ($result && $row = $result->fetch_assoc()) {
                         </div>
                     </form>
                 </div>
-                
-                <!-- PAR Entries Tab -->
-                <div class="tab-pane fade" id="par-entries" role="tabpanel">
-                    <?php if (empty($form_data)): ?>
-                        <div class="text-center py-5">
-                            <i class="bi bi-file-earmark-text fs-1 text-muted"></i>
-                            <p class="text-muted mt-3">No PAR entries found</p>
-                            <button class="btn btn-primary" onclick="createNewPAR()">
-                                <i class="bi bi-plus-circle"></i> Create First PAR
-                            </button>
-                        </div>
-                    <?php else: ?>
-                        <div class="table-responsive">
-                            <table id="parTable" class="table table-hover mb-0">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th>PAR No.</th>
-                                        <th>Entity Name</th>
-                                        <th>Received By</th>
-                                        <th>Office</th>
-                                        <th>Date Received</th>
-                                        <th>Items Count</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php foreach ($form_data as $entry): ?>
-                                        <?php
-                                        // Get item count for this PAR
-                                        $item_count_result = $conn->query("SELECT COUNT(*) as count FROM par_items WHERE form_id = " . $entry['id']);
-                                        $item_count = $item_count_result->fetch_assoc()['count'];
-                                        ?>
-                                        <tr>
-                                            <td><strong><?php echo htmlspecialchars($entry['par_no']); ?></strong></td>
-                                            <td><?php echo htmlspecialchars($entry['entity_name']); ?></td>
-                                            <td><?php echo htmlspecialchars($entry['received_by_name']); ?></td>
-                                            <td><?php echo htmlspecialchars($entry['office_name'] ?? 'Not assigned'); ?></td>
-                                            <td><?php echo date('M j, Y', strtotime($entry['date_received_left'])); ?></td>
-                                            <td><span class="badge bg-info"><?php echo $item_count; ?> items</span></td>
-                                            <td>
-                                                <div class="form-actions">
-                                                    <button class="btn btn-sm btn-outline-primary" onclick="viewPAR(<?php echo $entry['id']; ?>)">
-                                                        <i class="bi bi-eye"></i>
-                                                    </button>
-                                                    <button class="btn btn-sm btn-outline-success" onclick="manageItems(<?php echo $entry['id']; ?>)">
-                                                        <i class="bi bi-box"></i>
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    <?php endforeach; ?>
-                                </tbody>
-                            </table>
-                        </div>
-                    <?php endif; ?>
-                </div>
-            </div>
-        </div>
-            </div>
         </div>
     </div>
 
@@ -403,9 +355,18 @@ if ($result && $row = $result->fetch_assoc()) {
             const table = document.getElementById('itemsTable').getElementsByTagName('tbody')[0];
             const newRow = table.insertRow();
             
+            // Create unit dropdown HTML
+            const unitOptions = <?php 
+                $options = '<option value="">Select Unit</option>';
+                foreach ($common_units as $unit) {
+                    $options .= '<option value="' . htmlspecialchars($unit) . '">' . htmlspecialchars($unit) . '</option>';
+                }
+                echo json_encode($options);
+            ?>;
+            
             const cells = [
                 '<input type="number" class="form-control form-control-sm" name="quantity[]" required onchange="calculateAmount(this)">',
-                '<input type="text" class="form-control form-control-sm" name="unit[]" required>',
+                '<select class="form-select form-select-sm" name="unit[]" required>' + unitOptions + '</select>',
                 '<input type="text" class="form-control form-control-sm" name="description[]" required>',
                 '<input type="text" class="form-control form-control-sm" name="property_number[]">',
                 '<input type="date" class="form-control form-control-sm" name="date_acquired[]">',
@@ -457,18 +418,10 @@ if ($result && $row = $result->fetch_assoc()) {
             }
         }
         
-        function printForm() {
-            window.print();
-        }
-        
-        function createNewPAR() {
-            // Switch to input tab
-            const inputTab = document.getElementById('par-input-tab');
-            const tab = new bootstrap.Tab(inputTab);
-            tab.show();
-            
-            // Generate fresh PAR number
-            generateNewParNumber();
+        function viewPAREntries() {
+            // Redirect to PAR entries page or open a modal
+            // For now, let's redirect to a dedicated PAR entries page
+            window.location.href = 'par_entries.php';
         }
         
         // Generate new PAR number via AJAX
