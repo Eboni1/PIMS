@@ -320,8 +320,102 @@ if ($result && $row = $result->fetch_assoc()) {
         });
         
         function exportICSData() {
-            // TODO: Implement export functionality
-            alert('Export functionality will be implemented');
+            // Create export modal
+            const modalHtml = `
+                <div class="modal fade" id="exportModal" tabindex="-1" aria-labelledby="exportModalLabel" aria-hidden="true">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="exportModalLabel">
+                                    <i class="bi bi-download"></i> Export ICS Entries
+                                </h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <form id="exportForm" method="POST" action="export_ics.php">
+                                <div class="modal-body">
+                                    <div class="mb-3">
+                                        <label for="exportFormat" class="form-label">Export Format</label>
+                                        <select class="form-select" id="exportFormat" name="format" required>
+                                            <option value="excel">Excel (CSV) - Detailed</option>
+                                            <option value="summary">Excel (CSV) - Summary</option>
+                                        </select>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="dateFrom" class="form-label">Date From (Optional)</label>
+                                        <input type="date" class="form-control" id="dateFrom" name="date_from">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="dateTo" class="form-label">Date To (Optional)</label>
+                                        <input type="date" class="form-control" id="dateTo" name="date_to">
+                                    </div>
+                                    <div class="alert alert-info">
+                                        <i class="bi bi-info-circle"></i>
+                                        <small>
+                                            <strong>Excel (CSV) - Detailed:</strong> All items with complete details<br>
+                                            <strong>Excel (CSV) - Summary:</strong> Summary of ICS forms only
+                                        </small>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                    <button type="submit" class="btn btn-success">
+                                        <i class="bi bi-download"></i> Export
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Remove existing modal if present
+            const existingModal = document.getElementById('exportModal');
+            if (existingModal) {
+                existingModal.remove();
+            }
+            
+            // Add modal to body and show it
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            const modal = new bootstrap.Modal(document.getElementById('exportModal'));
+            modal.show();
+            
+            // Handle form submission
+            document.getElementById('exportForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const formData = new FormData(this);
+                const format = formData.get('format');
+                
+                // Show loading state
+                const submitBtn = this.querySelector('button[type="submit"]');
+                const originalText = submitBtn.innerHTML;
+                submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Exporting...';
+                submitBtn.disabled = true;
+                
+                // Create and submit form
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = 'export_ics.php';
+                
+                // Add form data
+                for (const [key, value] of formData.entries()) {
+                    const input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = key;
+                    input.value = value;
+                    form.appendChild(input);
+                }
+                
+                document.body.appendChild(form);
+                form.submit();
+                
+                // Reset button after delay
+                setTimeout(() => {
+                    submitBtn.innerHTML = originalText;
+                    submitBtn.disabled = false;
+                    bootstrap.Modal.getInstance(document.getElementById('exportModal')).hide();
+                }, 1000);
+            });
         }
     </script>
 </body>
