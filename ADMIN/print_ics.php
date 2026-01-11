@@ -367,7 +367,7 @@ logSystemAction($_SESSION['user_id'], 'Printed ICS Form', 'forms', "ICS ID: $ics
                         <td><?php echo number_format($item['unit_cost'], 2); ?></td>
                         <td><?php echo number_format($item['total_cost'], 2); ?></td>
                         <td class="text-left"><?php echo htmlspecialchars($item['description']); ?></td>
-                        <td></td>
+                        <td><?php echo htmlspecialchars($item['item_no']); ?></td>
                         <td><?php echo htmlspecialchars($item['useful_life']); ?></td>
                     </tr>
                 <?php endforeach; ?>
