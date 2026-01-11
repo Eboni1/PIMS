@@ -20,51 +20,54 @@ if (!in_array($_SESSION['role'], ['admin', 'system_admin'])) {
 }
 
 // Get RIS ID from URL
-$ris_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
-
-if ($ris_id <= 0) {
-    header('Location: ris_entries.php?error=Invalid RIS ID');
+$ris_id = $_GET['id'] ?? 0;
+if (empty($ris_id)) {
+    header('Location: ris_entries.php');
     exit();
 }
 
 // Get RIS form details
-$stmt = $conn->prepare("
-    SELECT * FROM ris_forms WHERE id = ?
-");
+$ris_form = null;
+$stmt = $conn->prepare("SELECT * FROM ris_forms WHERE id = ?");
 $stmt->bind_param("i", $ris_id);
 $stmt->execute();
 $result = $stmt->get_result();
+if ($result->num_rows > 0) {
+    $ris_form = $result->fetch_assoc();
+}
+$stmt->close();
 
-if ($result->num_rows !== 1) {
-    header('Location: ris_entries.php?error=RIS not found');
+if (!$ris_form) {
+    header('Location: ris_entries.php');
     exit();
 }
 
-$ris = $result->fetch_assoc();
-$stmt->close();
-
 // Get RIS items
 $ris_items = [];
-$stmt = $conn->prepare("
-    SELECT * FROM ris_items WHERE ris_form_id = ? ORDER BY stock_no
-");
+$stmt = $conn->prepare("SELECT * FROM ris_items WHERE ris_form_id = ? ORDER BY id");
 $stmt->bind_param("i", $ris_id);
 $stmt->execute();
-$items_result = $stmt->get_result();
-
-while ($row = $items_result->fetch_assoc()) {
+$result = $stmt->get_result();
+while ($row = $result->fetch_assoc()) {
     $ris_items[] = $row;
 }
 $stmt->close();
 
-logSystemAction($_SESSION['user_id'], 'Viewed RIS entry', 'forms', "RIS ID: $ris_id, RIS No: {$ris['ris_no']}");
+logSystemAction($_SESSION['user_id'], 'Viewed RIS Form', 'forms', "RIS ID: $ris_id, RIS No: {$ris_form['ris_no']}");
+
+// Get header image from forms table
+$header_image = '';
+$result = $conn->query("SELECT header_image FROM forms WHERE form_code = 'RIS'");
+if ($result && $row = $result->fetch_assoc()) {
+    $header_image = $row['header_image'];
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>View RIS - <?php echo htmlspecialchars($ris['ris_no']); ?> - PIMS</title>
+    <title>RIS View - <?php echo htmlspecialchars($ris_form['ris_no']); ?> - PIMS</title>
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Bootstrap Icons -->
@@ -91,7 +94,7 @@ logSystemAction($_SESSION['user_id'], 'Viewed RIS entry', 'forms', "RIS ID: $ris
             border-left: 4px solid var(--primary-color);
         }
         
-        .ris-card {
+        .form-card {
             background: white;
             border-radius: var(--border-radius-lg);
             padding: 2rem;
@@ -99,44 +102,42 @@ logSystemAction($_SESSION['user_id'], 'Viewed RIS entry', 'forms', "RIS ID: $ris
             margin-bottom: 2rem;
         }
         
+        .ris-number {
+            background: linear-gradient(135deg, #191BA9 0%, #5CC2F2 100%);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: var(--border-radius);
+            font-weight: 600;
+            display: inline-block;
+            margin-bottom: 1rem;
+        }
+        
+        .table-responsive {
+            border-radius: var(--border-radius);
+            overflow: hidden;
+        }
+        
         .table-bordered {
             border: 1px solid #dee2e6;
         }
         
-        .table-bordered th,
-        .table-bordered td {
-            border: 1px solid #dee2e6;
-            padding: 0.75rem;
-        }
-        
         .signature-section {
+            border-top: 2px solid #dee2e6;
+            padding-top: 2rem;
             margin-top: 2rem;
-        }
-        
-        .signature-box {
-            border: 1px solid #dee2e6;
-            padding: 1rem;
-            text-align: center;
-            margin-bottom: 1rem;
-        }
-        
-        .signature-line {
-            border-bottom: 1px solid #000;
-            height: 40px;
-            margin-bottom: 0.5rem;
         }
         
         @media print {
             .no-print { display: none !important; }
-            .ris-card { box-shadow: none; }
-            body { background: white; }
+            .form-card { box-shadow: none; }
+            .page-header { display: none !important; }
         }
     </style>
 </head>
 <body>
     <?php
     // Set page title for topbar
-    $page_title = 'View RIS';
+    $page_title = 'RIS View - ' . htmlspecialchars($ris_form['ris_no']);
     ?>
     <!-- Main Content Wrapper -->
     <div class="main-wrapper" id="mainWrapper">
@@ -147,70 +148,87 @@ logSystemAction($_SESSION['user_id'], 'Viewed RIS entry', 'forms', "RIS ID: $ris
     <!-- Main Content -->
     <div class="main-content">
         <!-- Page Header -->
-        <div class="page-header">
+        <div class="page-header no-print">
             <div class="row align-items-center">
                 <div class="col-md-8">
                     <h1 class="mb-2">
-                        <i class="bi bi-file-earmark-text"></i> View RIS
+                        <i class="bi bi-file-earmark-text"></i> RIS View
                     </h1>
-                    <p class="text-muted mb-0">RIS No: <?php echo htmlspecialchars($ris['ris_no']); ?></p>
+                    <p class="text-muted mb-0">View Requisition and Issue Slip details</p>
                 </div>
                 <div class="col-md-4 text-md-end no-print">
-                    <a href="ris_entries.php" class="btn btn-outline-secondary me-2">
+                    <a href="ris_entries.php" class="btn btn-outline-secondary btn-sm me-2">
                         <i class="bi bi-arrow-left"></i> Back to Entries
                     </a>
-                    <button class="btn btn-primary" onclick="window.print()">
+                    <button class="btn btn-outline-info btn-sm me-2" onclick="window.open('print_ris.php?id=<?php echo $ris_id; ?>', '_blank')">
                         <i class="bi bi-printer"></i> Print
                     </button>
+                    <a href="ris_form.php" class="btn btn-primary btn-sm">
+                        <i class="bi bi-plus-circle"></i> New RIS
+                    </a>
                 </div>
             </div>
         </div>
 
-        <!-- RIS Details -->
-        <div class="ris-card">
-            <!-- Entity Fields Header -->
-            <div class="row mb-3">
-                <div class="col-md-3">
-                    <label class="form-label"><strong>DIVISION:</strong></label>
-                    <p class="form-control-plaintext"><?php echo htmlspecialchars($ris['division']); ?></p>
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label"><strong>Responsibility Center:</strong></label>
-                    <p class="form-control-plaintext"><?php echo htmlspecialchars($ris['responsibility_center']); ?></p>
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label"><strong>RIS NO:</strong></label>
-                    <p class="form-control-plaintext"><?php echo htmlspecialchars($ris['ris_no']); ?></p>
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label"><strong>DATE:</strong></label>
-                    <p class="form-control-plaintext"><?php echo date('M d, Y', strtotime($ris['date'])); ?></p>
+        <!-- RIS Form -->
+        <div class="form-card">
+            <!-- Form Header -->
+            <div style="text-align: center; margin-bottom: 20px;">
+                <?php 
+                if (!empty($header_image)) {
+                    echo '<div style="margin-bottom: 10px;">';
+                    echo '<img src="../uploads/forms/' . htmlspecialchars($header_image) . '" alt="Header Image" style="width: 100%; max-height: 120px; object-fit: contain;">';
+                    echo '</div>';
+                }
+                ?>
+                <div style="text-align: center;">
+                    <p style="margin: 0; font-size: 16px; font-weight: bold;">REQUISITION AND ISSUE SLIP</p>
                 </div>
             </div>
             
-            <!-- Entity Fields Values -->
+            <!-- Entity Information Header -->
+            <div class="row mb-3">
+                <div class="col-md-3">
+                    <label class="form-label"><strong>DIVISION:</strong></label>
+                    <p class="form-control-plaintext"><?php echo htmlspecialchars($ris_form['division']); ?></p>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label"><strong>Responsibility Center:</strong></label>
+                    <p class="form-control-plaintext"><?php echo htmlspecialchars($ris_form['responsibility_center']); ?></p>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label"><strong>RIS NO:</strong></label>
+                    <p class="form-control-plaintext"><?php echo htmlspecialchars($ris_form['ris_no']); ?></p>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label"><strong>DATE:</strong></label>
+                    <p class="form-control-plaintext"><?php echo date('F d, Y', strtotime($ris_form['date'])); ?></p>
+                </div>
+            </div>
+            
+            <!-- Entity Information Values -->
             <div class="row mb-3">
                 <div class="col-md-3">
                     <label class="form-label"><strong>OFFICE:</strong></label>
-                    <p class="form-control-plaintext"><?php echo htmlspecialchars($ris['office']); ?></p>
+                    <p class="form-control-plaintext"><?php echo htmlspecialchars($ris_form['office']); ?></p>
                 </div>
                 <div class="col-md-3">
                     <label class="form-label"><strong>Code:</strong></label>
-                    <p class="form-control-plaintext"><?php echo htmlspecialchars($ris['code']); ?></p>
+                    <p class="form-control-plaintext"><?php echo htmlspecialchars($ris_form['code']); ?></p>
                 </div>
                 <div class="col-md-3">
                     <label class="form-label"><strong>SAI NO.:</strong></label>
-                    <p class="form-control-plaintext"><?php echo htmlspecialchars($ris['sai_no']); ?></p>
+                    <p class="form-control-plaintext"><?php echo htmlspecialchars($ris_form['sai_no']); ?></p>
                 </div>
                 <div class="col-md-3">
                     <label class="form-label"><strong>Date:</strong></label>
-                    <p class="form-control-plaintext"><?php echo date('M d, Y', strtotime($ris['date_2'])); ?></p>
+                    <p class="form-control-plaintext"><?php echo date('F d, Y', strtotime($ris_form['date_2'])); ?></p>
                 </div>
             </div>
-                            
+            
             <!-- Items Table -->
-            <div class="mb-3">
-                <label class="form-label"><strong>Items:</strong></label>
+            <div class="mb-4">
+                <h5 class="mb-3"><strong>Items:</strong></h5>
                 <div class="table-responsive">
                     <table class="table table-bordered">
                         <thead class="table-light">
@@ -235,53 +253,129 @@ logSystemAction($_SESSION['user_id'], 'Viewed RIS entry', 'forms', "RIS ID: $ris
                                 </tr>
                             <?php endforeach; ?>
                         </tbody>
+                        <tfoot>
+                            <tr class="table-light">
+                                <th colspan="5" class="text-end">Total:</th>
+                                <th>₱<?php echo number_format(array_sum(array_column($ris_items, 'total_amount')), 2); ?></th>
+                            </tr>
+                        </tfoot>
                     </table>
                 </div>
             </div>
-                            
+            
             <!-- Purpose -->
-            <div class="mb-3">
-                <label class="form-label"><strong>Purpose:</strong></label>
-                <p class="form-control-plaintext"><?php echo htmlspecialchars($ris['purpose']); ?></p>
+            <div class="row mb-4">
+                <div class="col-12">
+                    <label class="form-label"><strong>Purpose:</strong></label>
+                    <p class="form-control-plaintext"><?php echo htmlspecialchars($ris_form['purpose']); ?></p>
+                </div>
             </div>
-                            
+            
+            <div class="text-center mt-3">
+                <p class="text-muted fst-italic">Nothing follows</p>
+            </div>
+            
             <!-- Signature Section -->
             <div class="signature-section">
                 <div class="row">
                     <div class="col-md-3">
-                        <div class="signature-box">
+                        <div class="border p-3 text-center">
                             <label class="form-label"><strong>REQUESTED BY:</strong></label>
-                            <div class="signature-line"></div>
-                            <p class="mb-2"><strong>PRINTED NAME:</strong> <?php echo htmlspecialchars($ris['requested_by']); ?></p>
-                            <p class="mb-2"><strong>DESIGNATION:</strong> <?php echo htmlspecialchars($ris['requested_by_position']); ?></p>
-                            <p><strong>DATE:</strong> <?php echo $ris['requested_date'] ? date('M d, Y', strtotime($ris['requested_date'])) : ''; ?></p>
+                            <div class="mb-3">
+                                <small class="text-muted">SIGNATURE:</small>
+                                <div style="height: 60px; border-bottom: 1px solid #ccc;"></div>
+                            </div>
+                            <div class="mb-2">
+                                <small class="text-muted">PRINTED NAME:</small>
+                                <p class="mb-1"><?php echo htmlspecialchars($ris_form['requested_by']); ?></p>
+                            </div>
+                            <div class="mb-2">
+                                <small class="text-muted">DESIGNATION:</small>
+                                <p class="mb-1 text-muted"><?php echo htmlspecialchars($ris_form['requested_by_position']); ?></p>
+                            </div>
+                            <div>
+                                <small class="text-muted">DATE:</small>
+                                <?php if (!empty($ris_form['requested_date']) && $ris_form['requested_date'] !== '0000-00-00'): ?>
+                                    <p class="mb-1"><?php echo date('F d, Y', strtotime($ris_form['requested_date'])); ?></p>
+                                <?php else: ?>
+                                    <p class="mb-1">______________</p>
+                                <?php endif; ?>
+                            </div>
                         </div>
                     </div>
                     <div class="col-md-3">
-                        <div class="signature-box">
+                        <div class="border p-3 text-center">
                             <label class="form-label"><strong>APPROVED BY:</strong></label>
-                            <div class="signature-line"></div>
-                            <p class="mb-2"><strong>PRINTED NAME:</strong> <?php echo htmlspecialchars($ris['approved_by']); ?></p>
-                            <p class="mb-2"><strong>DESIGNATION:</strong> <?php echo htmlspecialchars($ris['approved_by_position']); ?></p>
-                            <p><strong>DATE:</strong> <?php echo $ris['approved_date'] ? date('M d, Y', strtotime($ris['approved_date'])) : ''; ?></p>
+                            <div class="mb-3">
+                                <small class="text-muted">SIGNATURE:</small>
+                                <div style="height: 60px; border-bottom: 1px solid #ccc;"></div>
+                            </div>
+                            <div class="mb-2">
+                                <small class="text-muted">PRINTED NAME:</small>
+                                <p class="mb-1"><?php echo htmlspecialchars($ris_form['approved_by']); ?></p>
+                            </div>
+                            <div class="mb-2">
+                                <small class="text-muted">DESIGNATION:</small>
+                                <p class="mb-1 text-muted"><?php echo htmlspecialchars($ris_form['approved_by_position']); ?></p>
+                            </div>
+                            <div>
+                                <small class="text-muted">DATE:</small>
+                                <?php if (!empty($ris_form['approved_date']) && $ris_form['approved_date'] !== '0000-00-00'): ?>
+                                    <p class="mb-1"><?php echo date('F d, Y', strtotime($ris_form['approved_date'])); ?></p>
+                                <?php else: ?>
+                                    <p class="mb-1">______________</p>
+                                <?php endif; ?>
+                            </div>
                         </div>
                     </div>
                     <div class="col-md-3">
-                        <div class="signature-box">
+                        <div class="border p-3 text-center">
                             <label class="form-label"><strong>ISSUED BY:</strong></label>
-                            <div class="signature-line"></div>
-                            <p class="mb-2"><strong>PRINTED NAME:</strong> <?php echo htmlspecialchars($ris['issued_by']); ?></p>
-                            <p class="mb-2"><strong>DESIGNATION:</strong> <?php echo htmlspecialchars($ris['issued_by_position']); ?></p>
-                            <p><strong>DATE:</strong> <?php echo $ris['issued_date'] ? date('M d, Y', strtotime($ris['issued_date'])) : ''; ?></p>
+                            <div class="mb-3">
+                                <small class="text-muted">SIGNATURE:</small>
+                                <div style="height: 60px; border-bottom: 1px solid #ccc;"></div>
+                            </div>
+                            <div class="mb-2">
+                                <small class="text-muted">PRINTED NAME:</small>
+                                <p class="mb-1"><?php echo htmlspecialchars($ris_form['issued_by']); ?></p>
+                            </div>
+                            <div class="mb-2">
+                                <small class="text-muted">DESIGNATION:</small>
+                                <p class="mb-1 text-muted"><?php echo htmlspecialchars($ris_form['issued_by_position']); ?></p>
+                            </div>
+                            <div>
+                                <small class="text-muted">DATE:</small>
+                                <?php if (!empty($ris_form['issued_date']) && $ris_form['issued_date'] !== '0000-00-00'): ?>
+                                    <p class="mb-1"><?php echo date('F d, Y', strtotime($ris_form['issued_date'])); ?></p>
+                                <?php else: ?>
+                                    <p class="mb-1">______________</p>
+                                <?php endif; ?>
+                            </div>
                         </div>
                     </div>
                     <div class="col-md-3">
-                        <div class="signature-box">
+                        <div class="border p-3 text-center">
                             <label class="form-label"><strong>RECEIVED BY:</strong></label>
-                            <div class="signature-line"></div>
-                            <p class="mb-2"><strong>PRINTED NAME:</strong> <?php echo htmlspecialchars($ris['received_by']); ?></p>
-                            <p class="mb-2"><strong>DESIGNATION:</strong> <?php echo htmlspecialchars($ris['received_by_position']); ?></p>
-                            <p><strong>DATE:</strong> <?php echo $ris['received_date'] ? date('M d, Y', strtotime($ris['received_date'])) : ''; ?></p>
+                            <div class="mb-3">
+                                <small class="text-muted">SIGNATURE:</small>
+                                <div style="height: 60px; border-bottom: 1px solid #ccc;"></div>
+                            </div>
+                            <div class="mb-2">
+                                <small class="text-muted">PRINTED NAME:</small>
+                                <p class="mb-1"><?php echo htmlspecialchars($ris_form['received_by']); ?></p>
+                            </div>
+                            <div class="mb-2">
+                                <small class="text-muted">DESIGNATION:</small>
+                                <p class="mb-1 text-muted"><?php echo htmlspecialchars($ris_form['received_by_position']); ?></p>
+                            </div>
+                            <div>
+                                <small class="text-muted">DATE:</small>
+                                <?php if (!empty($ris_form['received_date']) && $ris_form['received_date'] !== '0000-00-00'): ?>
+                                    <p class="mb-1"><?php echo date('F d, Y', strtotime($ris_form['received_date'])); ?></p>
+                                <?php else: ?>
+                                    <p class="mb-1">______________</p>
+                                <?php endif; ?>
+                            </div>
                         </div>
                     </div>
                 </div>
