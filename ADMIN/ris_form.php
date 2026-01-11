@@ -27,11 +27,37 @@ if ($next_ris_no === null) {
     $next_ris_no = ''; // Fallback if no configuration exists
 }
 
+// Get next SAI number
+$next_sai_no = getNextTagPreview('sai_no');
+if ($next_sai_no === null) {
+    $next_sai_no = ''; // Fallback if no configuration exists
+}
+
+// Get next Code
+$next_code = getNextTagPreview('code');
+if ($next_code === null) {
+    $next_code = ''; // Fallback if no configuration exists
+}
+
 // Get RIS configuration for JavaScript
 $ris_config = null;
 $result = $conn->query("SELECT * FROM tag_formats WHERE tag_type = 'ris_no' AND status = 'active'");
 if ($result && $row = $result->fetch_assoc()) {
     $ris_config = $row;
+}
+
+// Get SAI configuration for JavaScript
+$sai_config = null;
+$result = $conn->query("SELECT * FROM tag_formats WHERE tag_type = 'sai_no' AND status = 'active'");
+if ($result && $row = $result->fetch_assoc()) {
+    $sai_config = $row;
+}
+
+// Get Code configuration for JavaScript
+$code_config = null;
+$result = $conn->query("SELECT * FROM tag_formats WHERE tag_type = 'code' AND status = 'active'");
+if ($result && $row = $result->fetch_assoc()) {
+    $code_config = $row;
 }
 
 // Get header image from forms table
@@ -149,12 +175,7 @@ if ($result && $row = $result->fetch_assoc()) {
                     <p class="text-muted mb-0">Manage Requisition and Issue Slip forms</p>
                 </div>
                 <div class="col-md-4 text-md-end">
-                    <button class="btn btn-outline-primary btn-sm" onclick="createNewRIS()">
-                        <i class="bi bi-plus-circle"></i> Create New RIS
-                    </button>
-                    <button class="btn btn-outline-success btn-sm ms-2" onclick="exportRISData()">
-                        <i class="bi bi-download"></i> Export
-                    </button>
+                    <!-- Action buttons removed as requested -->
                 </div>
             </div>
         </div>
@@ -168,9 +189,6 @@ if ($result && $row = $result->fetch_assoc()) {
                 <div class="no-print">
                     <button class="btn btn-sm btn-outline-secondary" onclick="resetRISForm()">
                         <i class="bi bi-arrow-clockwise"></i> Reset
-                    </button>
-                    <button class="btn btn-sm btn-outline-info ms-2" onclick="printRISForm()">
-                        <i class="bi bi-printer"></i> Print
                     </button>
                 </div>
             </div>
@@ -193,22 +211,45 @@ if ($result && $row = $result->fetch_assoc()) {
                     </div>
                 </div>
                 
-                <!-- Entity Name, Fund Cluster, and RIS No -->
-                            <div class="row mb-3">
-                                <div class="col-md-4">
-                                    <label class="form-label"><strong>Entity Name:</strong></label>
-                                    <input type="text" class="form-control" name="entity_name" required>
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label"><strong>Fund Cluster:</strong></label>
-                                    <input type="text" class="form-control" name="fund_cluster" required>
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label"><strong>RIS No:</strong></label>
-                                    <input type="text" class="form-control bg-light" name="ris_no" id="ris_no" value="<?php echo htmlspecialchars($next_ris_no); ?>" readonly>
-                                    <small class="text-muted">Auto-generated next number from system configuration.</small>
-                                </div>
-                            </div>
+                <!-- Entity Fields Header -->
+                <div class="row mb-3">
+                    <div class="col-md-3">
+                        <label class="form-label"><strong>DIVISION:</strong></label>
+                        <input type="text" class="form-control" name="division" required>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label"><strong>Responsibility Center:</strong></label>
+                        <input type="text" class="form-control" name="responsibility_center" required>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label"><strong>RIS NO:</strong></label>
+                        <input type="text" class="form-control bg-light" name="ris_no" id="ris_no" value="<?php echo htmlspecialchars($next_ris_no); ?>" readonly>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label"><strong>DATE:</strong></label>
+                        <input type="date" class="form-control" name="date" required>
+                    </div>
+                </div>
+                
+                <!-- Entity Fields Values -->
+                <div class="row mb-3">
+                    <div class="col-md-3">
+                        <label class="form-label"><strong>OFFICE:</strong></label>
+                        <input type="text" class="form-control" name="office" required>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label"><strong>Code:</strong></label>
+                        <input type="text" class="form-control bg-light" name="code" id="code" value="<?php echo htmlspecialchars($next_code); ?>" readonly>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label"><strong>SAI NO.:</strong></label>
+                        <input type="text" class="form-control bg-light" name="sai_no" id="sai_no" value="<?php echo htmlspecialchars($next_sai_no); ?>" readonly>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label"><strong>Date:</strong></label>
+                        <input type="date" class="form-control" name="date_2" required>
+                    </div>
+                </div>
                             
                             <!-- Items Table -->
                             <div class="mb-3">
@@ -346,16 +387,6 @@ if ($result && $row = $result->fetch_assoc()) {
             }
         }
         
-        function printRISForm() {
-            window.print();
-        }
-        
-        function createNewRIS() {
-            document.getElementById('risForm').reset();
-            // Generate fresh RIS number
-            generateNewRisNumber();
-        }
-        
         // Generate new RIS number via AJAX
         function generateNewRisNumber() {
             <?php if ($ris_config): ?>
@@ -388,20 +419,92 @@ if ($result && $row = $result->fetch_assoc()) {
             <?php endif; ?>
         }
         
-        // Handle form submission to update counter
+        // Generate new SAI number via AJAX
+        function generateNewSaiNumber() {
+            <?php if ($sai_config): ?>
+            const components = <?php 
+                $components = json_decode($sai_config['format_components'], true);
+                if (is_string($components)) {
+                    $components = json_decode($components, true);
+                }
+                echo json_encode($components ?: []);
+            ?>;
+            const digits = <?php echo $sai_config['digits']; ?>;
+            const separator = '<?php echo $sai_config['separator']; ?>';
+            
+            fetch('../SYSTEM_ADMIN/tags.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: 'action=generate_preview&tag_type=sai_no&components=' + encodeURIComponent(JSON.stringify(components)) + '&digits=' + digits + '&separator=' + encodeURIComponent(separator)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.preview) {
+                    document.getElementById('sai_no').value = data.preview;
+                }
+            })
+            .catch(error => {
+                console.error('Error generating SAI number:', error);
+            });
+            <?php endif; ?>
+        }
+        
+        // Generate new Code via AJAX
+        function generateNewCode() {
+            <?php if ($code_config): ?>
+            const components = <?php 
+                $components = json_decode($code_config['format_components'], true);
+                if (is_string($components)) {
+                    $components = json_decode($components, true);
+                }
+                echo json_encode($components ?: []);
+            ?>;
+            const digits = <?php echo $code_config['digits']; ?>;
+            const separator = '<?php echo $code_config['separator']; ?>';
+            
+            fetch('../SYSTEM_ADMIN/tags.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: 'action=generate_preview&tag_type=code&components=' + encodeURIComponent(JSON.stringify(components)) + '&digits=' + digits + '&separator=' + encodeURIComponent(separator)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.preview) {
+                    document.getElementById('code').value = data.preview;
+                }
+            })
+            .catch(error => {
+                console.error('Error generating Code:', error);
+            });
+            <?php endif; ?>
+        }
+        
+        // Handle form submission to update counters
         document.getElementById('risForm').addEventListener('submit', function(e) {
-            // Always increment counter since field is always auto-generated
-            const incrementField = document.createElement('input');
-            incrementField.type = 'hidden';
-            incrementField.name = 'increment_ris_counter';
-            incrementField.value = '1';
-            this.appendChild(incrementField);
+            // Increment counters for all auto-generated fields
+            const incrementRisField = document.createElement('input');
+            incrementRisField.type = 'hidden';
+            incrementRisField.name = 'increment_ris_counter';
+            incrementRisField.value = '1';
+            this.appendChild(incrementRisField);
+            
+            const incrementSaiField = document.createElement('input');
+            incrementSaiField.type = 'hidden';
+            incrementSaiField.name = 'increment_sai_counter';
+            incrementSaiField.value = '1';
+            this.appendChild(incrementSaiField);
+            
+            const incrementCodeField = document.createElement('input');
+            incrementCodeField.type = 'hidden';
+            incrementCodeField.name = 'increment_code_counter';
+            incrementCodeField.value = '1';
+            this.appendChild(incrementCodeField);
         });
         
-        function exportRISData() {
-            // TODO: Implement export functionality
-            alert('Export functionality will be implemented');
-        }
     </script>
 </body>
 </html>
