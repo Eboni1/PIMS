@@ -481,14 +481,21 @@ try {
                     <h5 class="mb-0"><i class="bi bi-list-ul"></i> Consumables List</h5>
                 </div>
                 <div class="col-md-6">
-                    <select class="form-select form-select-sm" id="officeFilter">
-                        <option value="">All Offices</option>
-                        <?php foreach ($offices as $office): ?>
-                            <option value="<?php echo $office['id']; ?>" <?php echo $office_filter == $office['id'] ? 'selected' : ''; ?>>
-                                <?php echo htmlspecialchars($office['office_name']); ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
+                    <div class="row g-2">
+                        <div class="col-md-6">
+                            <select class="form-select form-select-sm" id="officeFilter">
+                                <option value="">All Offices</option>
+                                <?php foreach ($offices as $office): ?>
+                                    <option value="<?php echo $office['id']; ?>" <?php echo $office_filter == $office['id'] ? 'selected' : ''; ?>>
+                                        <?php echo htmlspecialchars($office['office_name']); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <input type="text" class="form-control form-control-sm" id="searchInput" placeholder="Search consumables..." value="<?php echo htmlspecialchars($search_filter); ?>">
+                        </div>
+                    </div>
                 </div>
             </div>
             
@@ -710,86 +717,73 @@ try {
         let consumablesTable;
         
         document.addEventListener('DOMContentLoaded', function() {
-            // Initialize DataTable
-            consumablesTable = $('#consumablesTable').DataTable({
-                responsive: true,
-                pageLength: 25,
-                lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
-                order: [[6, 'desc']], // Sort by Created date column (index 6) by default
-                columnDefs: [
-                    {
-                        targets: 3, // Total Value column
-                        orderable: true,
-                        render: function(data, type, row) {
-                            if (type === 'sort' || type === 'type') {
-                                // Remove formatting and convert to number for sorting
-                                return parseFloat(data.replace(/[^0-9.-]+/g, ''));
-                            }
-                            return data;
-                        }
-                    },
-                    {
-                        targets: 6, // Created date column
-                        orderable: true,
-                        render: function(data, type, row) {
-                            if (type === 'sort' || type === 'type') {
-                                // Convert date string to timestamp for sorting
-                                return new Date(data).getTime();
-                            }
-                            return data;
-                        }
-                    },
-                    {
-                        targets: -1, // Actions column (last column)
-                        orderable: false,
-                        searchable: false
-                    }
-                ],
-                dom: '<"row"<"col-md-6"l><"col-md-6 text-end"f>>rtip',
-                language: {
-                    search: "Search consumables:",
-                    lengthMenu: "Show _MENU_ consumables per page",
-                    info: "Showing _START_ to _END_ of _TOTAL_ consumables",
-                    paginate: {
-                        first: "First",
-                        last: "Last",
-                        next: "Next",
-                        previous: "Previous"
-                    },
-                    emptyTable: "No consumables available",
-                    zeroRecords: "No matching consumables found"
-                }
-            });
+            // Since we're using backend filtering and pagination, 
+            // we don't need to initialize DataTables
+            // The table will be rendered by PHP with proper filtering
+            consumablesTable = null;
             
             // Office filter
             $('#officeFilter').on('change', function() {
                 const officeValue = this.value;
+                const currentUrl = new URL(window.location);
                 if (officeValue) {
-                    consumablesTable.column(5).search($(this).find('option:selected').text()).draw();
+                    currentUrl.searchParams.set('office', officeValue);
                 } else {
-                    consumablesTable.column(5).search('').draw();
+                    currentUrl.searchParams.delete('office');
                 }
+                // Preserve search parameter if exists
+                const searchValue = currentUrl.searchParams.get('search');
+                if (!searchValue) {
+                    currentUrl.searchParams.delete('search');
+                }
+                window.location.href = currentUrl.toString();
+            });
+            
+            // Search functionality with debounce
+            let searchTimeout;
+            $('#searchInput').on('input', function() {
+                clearTimeout(searchTimeout);
+                const searchValue = this.value.trim();
+                
+                searchTimeout = setTimeout(() => {
+                    const currentUrl = new URL(window.location);
+                    if (searchValue) {
+                        currentUrl.searchParams.set('search', searchValue);
+                    } else {
+                        currentUrl.searchParams.delete('search');
+                    }
+                    // Preserve office parameter if exists
+                    const officeValue = currentUrl.searchParams.get('office');
+                    if (!officeValue) {
+                        currentUrl.searchParams.delete('office');
+                    }
+                    window.location.href = currentUrl.toString();
+                }, 500); // Wait 500ms after user stops typing
             });
         });
         
         // Export consumables function
         function exportConsumables() {
-            // Use DataTables export functionality
-            const data = consumablesTable.data().toArray();
+            // Get current table data from DOM
+            const table = document.getElementById('consumablesTable');
+            const rows = table.getElementsByTagName('tbody')[0].getElementsByTagName('tr');
             let csv = 'Description,Quantity,Unit Cost,Total Value,Reorder Level,Office,Created\n';
             
-            data.forEach(row => {
-                const rowData = [
-                    row[0].replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim(), // Description
-                    row[1], // Quantity
-                    row[2], // Unit Cost
-                    row[3].replace(/[^0-9.-]+/g, ''), // Total Value
-                    row[4], // Reorder Level
-                    row[5], // Office
-                    row[6]  // Created
-                ];
-                csv += rowData.map(cell => `"${cell.trim()}"`).join(',') + '\n';
-            });
+            for (let i = 0; i < rows.length; i++) {
+                const cells = rows[i].getElementsByTagName('td');
+                if (cells.length === 8) { // Skip empty message row
+                    const rowData = [
+                        cells[0].textContent.replace(/\s+/g, ' ').trim(), // Description
+                        cells[1].textContent.trim(), // Quantity
+                        cells[2].textContent.trim(), // Unit Cost
+                        cells[3].textContent.replace(/[^0-9.-]+/g, '').trim(), // Total Value
+                        cells[4].textContent.trim(), // Reorder Level
+                        cells[5].textContent.trim(), // Office
+                        cells[6].textContent.trim()  // Created
+                    ];
+                    csv += rowData.map(cell => `"${cell}"`).join(',') + '\n';
+                }
+            }
             
             const blob = new Blob([csv], { type: 'text/csv' });
             const url = window.URL.createObjectURL(blob);
