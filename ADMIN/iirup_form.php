@@ -303,7 +303,18 @@ if ($result && $row = $result->fetch_assoc()) {
                                 </div>
                                 <div class="col-md-4">
                                     <label class="form-label" style="font-weight: normal; margin-bottom: 5px;">Department/Office:</label>
-                                    <input type="text" class="form-control" name="department_office" required>
+                                    <select class="form-control" name="department_office" required>
+                                        <option value="">Select Department/Office</option>
+                                        <?php
+                                        // Fetch offices from database
+                                        $offices_result = $conn->query("SELECT office_name FROM offices WHERE status = 'active' ORDER BY office_name");
+                                        if ($offices_result) {
+                                            while ($office = $offices_result->fetch_assoc()) {
+                                                echo '<option value="' . htmlspecialchars($office['office_name']) . '">' . htmlspecialchars($office['office_name']) . '</option>';
+                                            }
+                                        }
+                                        ?>
+                                    </select>
                                 </div>
                             </div>
                         </div>
