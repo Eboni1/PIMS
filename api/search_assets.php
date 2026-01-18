@@ -11,22 +11,23 @@ if (empty($query)) {
 }
 
 try {
-    // Search asset items with office information, excluding unserviceable status only
-    // Include assets with property_no even if they have no_tag status
+    // Search asset items with office information, only serviceable assets with required fields
     $sql = "SELECT ai.id, ai.description, ai.value, ai.acquisition_date, ai.status, 
-                   ai.property_no, ai.created_at, o.office_name 
+                   ai.property_no, ai.inventory_tag, ai.created_at, o.office_name 
             FROM asset_items ai 
             LEFT JOIN offices o ON ai.office_id = o.id 
-            WHERE (ai.description LIKE ? OR ai.id LIKE ? OR ai.property_no LIKE ?) 
-            AND ai.status != 'unserviceable'
+            WHERE (ai.description LIKE ? OR ai.id LIKE ? OR ai.property_no LIKE ? OR ai.inventory_tag LIKE ?) 
+            AND ai.status = 'serviceable'
             AND ai.property_no IS NOT NULL 
             AND ai.property_no != ''
+            AND ai.inventory_tag IS NOT NULL 
+            AND ai.inventory_tag != ''
             ORDER BY ai.description
             LIMIT 10";
     
     $searchTerm = "%$query%";
     $stmt = $conn->prepare($sql);
-    $stmt->bind_param("sss", $searchTerm, $searchTerm, $searchTerm);
+    $stmt->bind_param("ssss", $searchTerm, $searchTerm, $searchTerm, $searchTerm);
     $stmt->execute();
     $result = $stmt->get_result();
     
@@ -39,6 +40,7 @@ try {
             'acquisition_date' => $row['acquisition_date'],
             'status' => $row['status'],
             'property_no' => $row['property_no'],
+            'inventory_tag' => $row['inventory_tag'],
             'created_at' => $row['created_at'],
             'office_name' => $row['office_name']
         ];

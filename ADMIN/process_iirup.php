@@ -153,8 +153,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 
                 $conn->query($item_sql);
                 
-                // Extract asset ID from particulars if it matches an asset description
-                $asset_id = extractAssetIdFromDescription($particular);
+                // Extract asset ID from property number field first, then from particulars
+                $asset_id = null;
+                $property_no = $property_nos[$index] ?? '';
+                
+                // First try to find asset by property number from the dedicated field
+                if (!empty($property_no)) {
+                    $asset_id = getAssetIdByPropertyNo($property_no);
+                }
+                
+                // If not found, try to extract from particulars description
+                if (!$asset_id && !empty($particular)) {
+                    $asset_id = extractAssetIdFromDescription($particular);
+                }
+                
                 if ($asset_id) {
                     $asset_ids_to_update[] = $asset_id;
                 }
@@ -167,11 +179,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             if (!empty($unique_asset_ids)) {
                 $ids_string = implode(',', array_map('intval', $unique_asset_ids));
-                $update_sql = "UPDATE asset_items SET status = 'unserviceable' 
-                              WHERE id IN ($ids_string) AND status != 'disposed'";
                 
-                $conn->query($update_sql);
-                error_log("Updated asset items to unserviceable: " . $update_sql);
+                // First, check which assets exist and their current status
+                $check_sql = "SELECT id, property_no, status FROM asset_items WHERE id IN ($ids_string)";
+                $check_result = $conn->query($check_sql);
+                
+                $assets_to_update = [];
+                $already_disposed = [];
+                $already_unserviceable = [];
+                
+                while ($asset = $check_result->fetch_assoc()) {
+                    if ($asset['status'] === 'disposed') {
+                        $already_disposed[] = $asset['property_no'];
+                    } elseif ($asset['status'] === 'unserviceable') {
+                        $already_unserviceable[] = $asset['property_no'];
+                    } else {
+                        $assets_to_update[] = $asset['id'];
+                    }
+                }
+                
+                // Log asset status information
+                if (!empty($already_disposed)) {
+                    error_log("Assets already disposed, not updating: " . implode(', ', $already_disposed));
+                }
+                if (!empty($already_unserviceable)) {
+                    error_log("Assets already unserviceable: " . implode(', ', $already_unserviceable));
+                }
+                
+                // Update only assets that can be changed to unserviceable
+                if (!empty($assets_to_update)) {
+                    $update_ids_string = implode(',', $assets_to_update);
+                    $update_sql = "UPDATE asset_items SET status = 'unserviceable', last_updated = NOW() 
+                                  WHERE id IN ($update_ids_string)";
+                    
+                    $update_result = $conn->query($update_sql);
+                    $updated_count = $conn->affected_rows;
+                    
+                    error_log("Updated $updated_count asset items to unserviceable. IDs: " . implode(', ', $assets_to_update));
+                    
+                    // Log the action for audit trail
+                    logSystemAction($_SESSION['user_id'], 'Updated asset status to unserviceable', 'assets', 
+                                  'asset_ids: ' . implode(',', $assets_to_update) . ', form_id: ' . $form_id);
+                }
             }
         }
         
@@ -200,6 +249,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Not a POST request
     header('Location: iirup_form.php');
     exit();
+}
+
+// Helper function to get asset ID by property number
+function getAssetIdByPropertyNo($property_no) {
+    global $conn;
+    $property_no = trim($property_no);
+    
+    if (empty($property_no)) {
+        return null;
+    }
+    
+    error_log("Looking up asset by property number: $property_no");
+    
+    $stmt = $conn->prepare("SELECT id FROM asset_items WHERE property_no = ? LIMIT 1");
+    $stmt->bind_param("s", $property_no);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    if ($row = $result->fetch_assoc()) {
+        error_log("Found asset ID: " . $row['id'] . " for property number: $property_no");
+        return (int)$row['id'];
+    }
+    
+    error_log("No asset found for property number: $property_no");
+    return null;
 }
 
 // Helper function to extract asset ID from description
