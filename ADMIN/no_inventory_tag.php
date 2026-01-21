@@ -122,9 +122,7 @@ try {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Bootstrap Icons -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.3/font/bootstrap-icons.css">
-    <!-- DataTables CSS -->
-    <link href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" rel="stylesheet">
-    <!-- Google Fonts -->
+        <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <!-- Custom CSS -->
     <link href="../assets/css/index.css" rel="stylesheet">
@@ -379,93 +377,47 @@ try {
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <!-- jQuery -->
     <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
-    <!-- DataTables JS -->
-    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
-    <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
-    <?php require_once 'includes/sidebar-scripts.php'; ?>
+        <?php require_once 'includes/sidebar-scripts.php'; ?>
     <script>
         $(document).ready(function() {
-            // Initialize DataTable
-            var table = $('#untaggedTable').DataTable({
-                responsive: true,
-                pageLength: 25,
-                lengthMenu: [[10, 25, 50, -1], [10, 25, 50, "All"]],
-                order: [[7, 'desc']], // Sort by last updated column by default
-                searching: false, // Disable DataTables default search
-                language: {
-                    lengthMenu: "Show _MENU_ assets per page",
-                    info: "Showing _START_ to _END_ of _TOTAL_ untagged assets",
-                    paginate: {
-                        first: "First",
-                        last: "Last",
-                        next: "Next",
-                        previous: "Previous"
-                    },
-                    emptyTable: "No asset items requiring inventory tags found."
-                },
-                columnDefs: [
-                    {
-                        targets: [0], // Category column
-                        orderable: true
-                    },
-                    {
-                        targets: [7], // Actions column
-                        orderable: false,
-                        searchable: false
-                    }
-                ]
-            });
-
             // Custom search functionality
             $('#searchInput').on('keyup', function() {
-                table.search(this.value).draw();
+                const searchTerm = $(this).val().toLowerCase();
+                $('table tbody tr').each(function() {
+                    const row = $(this);
+                    const text = row.text().toLowerCase();
+                    row.toggle(text.includes(searchTerm));
+                });
             });
-
-            // Office filter functionality
-            $('#officeFilter').on('change', function() {
-                var officeValue = this.value;
-                if (officeValue === '') {
-                    // Clear office filter
-                    table.column(5).search('').draw();
-                } else {
-                    // Apply office filter to the Office column (index 5)
-                    table.column(5).search(officeValue).draw();
-                }
-            });
-
-            // Set initial office filter if selected
-            var initialOfficeFilter = '<?php echo $office_filter; ?>';
-            if (initialOfficeFilter !== '0') {
-                $('#officeFilter').val(initialOfficeFilter);
-                table.column(5).search(initialOfficeFilter).draw();
-            }
-
-            // Set initial search if provided
+            
+            // Initialize search from URL parameter
             var initialSearch = '<?php echo htmlspecialchars($search_filter); ?>';
             if (initialSearch !== '') {
                 $('#searchInput').val(initialSearch);
-                table.search(initialSearch).draw();
+                $('#searchInput').trigger('keyup');
             }
         });
 
         // Export untagged assets function
         function exportUntagged() {
-            const table = $('#untaggedTable').DataTable();
-            let csv = 'ID,Category,Asset Description,Item Description,Status,Value,Office,Last Updated\n';
+            let csv = 'ID,Category,Asset Description,Item Description,Status,Value,Office,Last Updated,Actions\n';
             
-            const data = table.data().toArray();
-            for (let row of data) {
-                const rowData = [
-                    row[0], // Category
-                    row[1], // Asset Description  
-                    row[2], // Item Description
-                    row[3], // Status
-                    row[4], // Value
-                    row[5], // Office
-                    row[6]  // Last Updated
-                ];
-                csv += rowData.map(cell => `"${cell.toString().trim()}"`).join(',') + '\n';
-            }
+            $('table tbody tr').each(function() {
+                if ($(this).find('td').length > 1) { // Skip empty rows
+                    const row = $(this).find('td');
+                    const rowData = [
+                        row.eq(0).text().trim(), // Category
+                        row.eq(1).text().trim(), // Asset Description  
+                        row.eq(2).text().trim(), // Item Description
+                        row.eq(3).text().trim(), // Status
+                        row.eq(4).text().trim(), // Value
+                        row.eq(5).text().trim(), // Office
+                        row.eq(6).text().trim(), // Last Updated
+                        row.eq(7).text().trim()  // Actions
+                    ];
+                    csv += rowData.map(cell => `"${cell}"`).join(',') + '\n';
+                }
+            });
             
             const blob = new Blob([csv], { type: 'text/csv' });
             const url = window.URL.createObjectURL(blob);
