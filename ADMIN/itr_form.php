@@ -376,14 +376,13 @@ if ($result && $row = $result->fetch_assoc()) {
                     </div>
                     <div class="row mb-3">
                         <div class="col-md-3">
-                            <p class="mb-4">Signature:</p>
+                           
                             <p class="mb-5">Printed Name:</p>
                             <p class="mb-5">Designation:</p>
                             <p class="mb-3">Date:</p>
                         </div>
 
                         <div class="col-md-3">
-                            <p class="mb-3" style="visibility: hidden;">h</p>
 
                             <input type="text" class="form-control mb-3" name="approved_by" required>
 
@@ -393,8 +392,7 @@ if ($result && $row = $result->fetch_assoc()) {
                         </div>
 
                         <div class="col-md-3">
-                            <p class="mb-3" style="visibility: hidden;">h</p>
-
+                            
                             <input type="text" class="form-control mb-3" name="released_by" required>
 
                             <input type="text" class="form-control mb-3" name="released_by_position" required>
@@ -403,8 +401,7 @@ if ($result && $row = $result->fetch_assoc()) {
                         </div>
 
                         <div class="col-md-3">
-                            <p class="mb-3" style="visibility: hidden;">h</p>
-
+                            
                             <input type="text" class="form-control mb-3" name="received_by" required>
 
                             <input type="text" class="form-control mb-3" name="received_by_position" required>

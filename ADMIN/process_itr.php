@@ -27,17 +27,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $itr_no = $_POST['itr_no'];
         $from_office = $_POST['from_office'];
         $to_office = $_POST['to_office'];
+        $transfer_date = $_POST['transfer_date'];
+        $transfer_type = $_POST['transfer_type'];
+        $transfer_type_others = $_POST['transfer_type_others'] ?? '';
+        $end_user = $_POST['end_user'] ?? '';
         $purpose = $_POST['purpose'];
-        $requested_by = $_POST['requested_by'];
-        $requested_by_position = $_POST['requested_by_position'];
-        $requested_date = $_POST['requested_date'];
         $approved_by = $_POST['approved_by'];
         $approved_by_position = $_POST['approved_by_position'];
         $approved_date = $_POST['approved_date'];
+        $released_by = $_POST['released_by'];
+        $released_by_position = $_POST['released_by_position'];
+        $released_date = $_POST['released_date'];
+        $received_by = $_POST['received_by'];
+        $received_by_position = $_POST['received_by_position'];
+        $received_date = $_POST['received_date'];
         $items = $_POST['item_no'] ?? [];
         $descriptions = $_POST['description'] ?? [];
         $quantities = $_POST['quantity'] ?? [];
-        $units = $_POST['unit'] ?? [];
+        $date_acquireds = $_POST['date_acquired'] ?? [];
+        $ics_par_nos = $_POST['ics_par_no'] ?? [];
+        $conditions = $_POST['condition'] ?? [];
         $unit_prices = $_POST['unit_price'] ?? [];
         $total_amounts = $_POST['total_amount'] ?? [];
         $remarks = $_POST['remarks'] ?? [];
@@ -61,8 +70,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $conn->begin_transaction();
         
         // Insert ITR form
-        $stmt = $conn->prepare("INSERT INTO itr_forms (entity_name, fund_cluster, itr_no, from_office, to_office, purpose, requested_by, requested_by_position, requested_date, approved_by, approved_by_position, approved_date, created_by, updated_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-        $stmt->bind_param("sssssssssssi", $entity_name, $fund_cluster, $itr_no, $from_office, $to_office, $purpose, $requested_by, $requested_by_position, $requested_date, $approved_by, $approved_by_position, $approved_date, $_SESSION['user_id'], $_SESSION['user_id']);
+        $stmt = $conn->prepare("INSERT INTO itr_forms (entity_name, fund_cluster, itr_no, from_office, to_office, transfer_date, transfer_type, transfer_type_others, end_user, purpose, approved_by, approved_by_position, approved_date, released_by, released_by_position, released_date, received_by, received_by_position, received_date, created_by, updated_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt->bind_param("sssssssssssssssssssi", $entity_name, $fund_cluster, $itr_no, $from_office, $to_office, $transfer_date, $transfer_type, $transfer_type_others, $end_user, $purpose, $approved_by, $approved_by_position, $approved_date, $released_by, $released_by_position, $released_date, $received_by, $received_by_position, $received_date, $_SESSION['user_id'], $_SESSION['user_id']);
         
         if (!$stmt->execute()) {
             throw new Exception('Failed to save ITR form: ' . $stmt->error);
@@ -72,7 +81,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->close();
         
         // Insert ITR items
-        $item_stmt = $conn->prepare("INSERT INTO itr_items (form_id, item_no, description, quantity, unit, unit_price, total_amount, remarks) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+        $item_stmt = $conn->prepare("INSERT INTO itr_items (form_id, item_no, date_acquired, ics_par_no, description, quantity, unit_price, total_amount, condition_of_inventory, remarks) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         
         for ($i = 0; $i < count($items); $i++) {
             if (!empty($items[$i]) && !empty($descriptions[$i])) {
@@ -80,7 +89,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $unit_price = floatval($unit_prices[$i]);
                 $total_amount = floatval($total_amounts[$i]);
                 
-                $item_stmt->bind_param("issdddds", $itr_form_id, $items[$i], $descriptions[$i], $quantity, $units[$i], $unit_price, $total_amount, $remarks[$i]);
+                $item_stmt->bind_param("issssddsss", $itr_form_id, $items[$i], $date_acquireds[$i], $ics_par_nos[$i], $descriptions[$i], $quantity, $unit_price, $total_amount, $conditions[$i], $remarks[$i]);
                 
                 if (!$item_stmt->execute()) {
                     throw new Exception('Failed to save ITR item: ' . $item_stmt->error);
