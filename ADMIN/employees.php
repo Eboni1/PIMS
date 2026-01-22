@@ -28,9 +28,57 @@ $office_filter = isset($_GET['office']) ? intval($_GET['office']) : 0;
 $status_filter = isset($_GET['status']) ? trim($_GET['status']) : '';
 $clearance_filter = isset($_GET['clearance']) ? trim($_GET['clearance']) : '';
 
+// Pagination parameters
+$page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
+$per_page = 10; // Number of records per page
+$offset = ($page - 1) * $per_page;
+
 // Get employees with filters
 $employees = [];
+$total_records = 0;
 try {
+    // First, get total count for pagination
+    $count_sql = "SELECT COUNT(*) as total 
+                  FROM employees e 
+                  LEFT JOIN offices o ON e.office_id = o.id 
+                  WHERE 1=1";
+    
+    $count_params = [];
+    $count_types = '';
+    
+    if ($search_filter !== '') {
+        $count_sql .= " AND (e.firstname LIKE ? OR e.lastname LIKE ? OR e.email LIKE ? OR e.employee_no LIKE ?)";
+        $searchParam = "%{$search_filter}%";
+        $count_params = array_merge($count_params, [$searchParam, $searchParam, $searchParam, $searchParam]);
+        $count_types = $count_types . 'ssss';
+    }
+    
+    if ($office_filter > 0) {
+        $count_sql .= " AND e.office_id = ?";
+        $count_params[] = $office_filter;
+        $count_types = $count_types . 'i';
+    }
+    
+    if ($status_filter !== '') {
+        $count_sql .= " AND e.employment_status = ?";
+        $count_params[] = $status_filter;
+        $count_types = $count_types . 's';
+    }
+    
+    if ($clearance_filter !== '') {
+        $count_sql .= " AND e.clearance_status = ?";
+        $count_params[] = $clearance_filter;
+        $count_types = $count_types . 's';
+    }
+    
+    $count_stmt = $conn->prepare($count_sql);
+    if (!empty($count_params)) {
+        $count_stmt->bind_param($count_types, ...$count_params);
+    }
+    $count_stmt->execute();
+    $total_records = $count_stmt->get_result()->fetch_assoc()['total'];
+    
+    // Now get the paginated data
     $sql = "SELECT e.*, o.office_name 
             FROM employees e 
             LEFT JOIN offices o ON e.office_id = o.id 
@@ -38,33 +86,36 @@ try {
     
     $params = [];
     $types = '';
-    
+
     if ($search_filter !== '') {
         $sql .= " AND (e.firstname LIKE ? OR e.lastname LIKE ? OR e.email LIKE ? OR e.employee_no LIKE ?)";
         $searchParam = "%{$search_filter}%";
         $params = array_merge($params, [$searchParam, $searchParam, $searchParam, $searchParam]);
-        $types .= 'ssss';
+        $types = $types . 'ssss';
     }
-    
+
     if ($office_filter > 0) {
         $sql .= " AND e.office_id = ?";
         $params[] = $office_filter;
-        $types .= 'i';
+        $types = $types . 'i';
     }
-    
+
     if ($status_filter !== '') {
         $sql .= " AND e.employment_status = ?";
         $params[] = $status_filter;
-        $types .= 's';
+        $types = $types . 's';
     }
-    
+
     if ($clearance_filter !== '') {
         $sql .= " AND e.clearance_status = ?";
         $params[] = $clearance_filter;
-        $types .= 's';
+        $types = $types . 's';
     }
     
-    $sql .= " ORDER BY e.lastname, e.firstname";
+    $sql .= " ORDER BY e.lastname, e.firstname LIMIT ? OFFSET ?";
+    $params[] = $per_page;
+    $params[] = $offset;
+    $types = $types . 'ii';
     
     $stmt = $conn->prepare($sql);
     if (!empty($params)) {
@@ -80,6 +131,7 @@ try {
 } catch (Exception $e) {
     error_log("Error fetching employees: " . $e->getMessage());
     $employees = [];
+    $total_records = 0;
 }
 
 // Get offices for filter dropdown
@@ -95,12 +147,13 @@ try {
 
 // Calculate statistics
 $stats = [
-    'total_employees' => count($employees),
+    'total_employees' => $total_records,
     'permanent_employees' => 0,
     'cleared_employees' => 0,
     'uncleared_employees' => 0
 ];
 
+// Calculate statistics based on filtered data
 foreach ($employees as $emp) {
     if ($emp['employment_status'] === 'permanent') {
         $stats['permanent_employees']++;
@@ -111,6 +164,11 @@ foreach ($employees as $emp) {
         $stats['uncleared_employees']++;
     }
 }
+
+// Pagination calculations
+$total_pages = ceil($total_records / $per_page);
+$showing_from = $total_records > 0 ? ($page - 1) * $per_page + 1 : 0;
+$showing_to = min($page * $per_page, $total_records);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -122,8 +180,6 @@ foreach ($employees as $emp) {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Bootstrap Icons -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.3/font/bootstrap-icons.css">
-    <!-- DataTables CSS -->
-    <link href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" rel="stylesheet">
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <!-- Custom CSS -->
@@ -263,7 +319,8 @@ foreach ($employees as $emp) {
                 </div>
                 <div class="col-md-6">
                     <div class="row g-2">
-                        <div class="col-md-4">
+                        
+                        <div class="col-md-3">
                             <select class="form-select form-select-sm" id="officeFilter">
                                 <option value="">All Offices</option>
                                 <?php foreach ($offices as $office): ?>
@@ -273,7 +330,7 @@ foreach ($employees as $emp) {
                                 <?php endforeach; ?>
                             </select>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <select class="form-select form-select-sm" id="statusFilter">
                                 <option value="">All Status</option>
                                 <option value="permanent" <?php echo $status_filter == 'permanent' ? 'selected' : ''; ?>>Permanent</option>
@@ -283,12 +340,16 @@ foreach ($employees as $emp) {
                                 <option value="retired" <?php echo $status_filter == 'retired' ? 'selected' : ''; ?>>Retired</option>
                             </select>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <select class="form-select form-select-sm" id="clearanceFilter">
                                 <option value="">All Clearance</option>
                                 <option value="cleared" <?php echo $clearance_filter == 'cleared' ? 'selected' : ''; ?>>Cleared</option>
                                 <option value="uncleared" <?php echo $clearance_filter == 'uncleared' ? 'selected' : ''; ?>>Uncleared</option>
                             </select>
+                        </div>
+
+                        <div class="col-md-3">
+                            <input type="text" class="form-control form-control-sm" id="searchInput" placeholder="Search employees..." value="<?php echo htmlspecialchars($search_filter); ?>">
                         </div>
                     </div>
                 </div>
@@ -296,7 +357,7 @@ foreach ($employees as $emp) {
             
             <div class="table-responsive">
                 <table class="table table-hover" id="employeesTable">
-                    <thead>
+                    <thead class="table-light">
                         <tr>
                             <th>Employee No.</th>
                             <th>Name</th>
@@ -388,6 +449,110 @@ foreach ($employees as $emp) {
                     </tbody>
                 </table>
             </div>
+            
+            <!-- Pagination -->
+            <?php if ($total_pages > 1): ?>
+            <div class="d-flex justify-content-between align-items-center mt-3">
+                <div class="text-muted">
+                    Showing <?php echo $showing_from; ?> to <?php echo $showing_to; ?> of <?php echo $total_records; ?> employees
+                </div>
+                <nav>
+                    <ul class="pagination pagination-sm mb-0">
+                        <?php
+                        // Build URL parameters for pagination links
+                        $url_params = http_build_query([
+                            'search' => $search_filter,
+                            'office' => $office_filter,
+                            'status' => $status_filter,
+                            'clearance' => $clearance_filter
+                        ]);
+                        
+                        // Previous button
+                        if ($page > 1):
+                            $prev_page = $page - 1;
+                            $prev_url = "?page=$prev_page" . ($url_params ? "&$url_params" : "");
+                        ?>
+                            <li class="page-item">
+                                <a class="page-link" href="<?php echo $prev_url; ?>" aria-label="Previous">
+                                    <span aria-hidden="true">&laquo;</span>
+                                </a>
+                            </li>
+                        <?php else: ?>
+                            <li class="page-item disabled">
+                                <span class="page-link" aria-label="Previous">
+                                    <span aria-hidden="true">&laquo;</span>
+                                </span>
+                            </li>
+                        <?php endif; ?>
+                        
+                        <?php
+                        // Page numbers
+                        $start_page = max(1, $page - 2);
+                        $end_page = min($total_pages, $page + 2);
+                        
+                        if ($start_page > 1):
+                            $first_url = "?page=1" . ($url_params ? "&$url_params" : "");
+                        ?>
+                            <li class="page-item">
+                                <a class="page-link" href="<?php echo $first_url; ?>">1</a>
+                            </li>
+                            <?php if ($start_page > 2): ?>
+                                <li class="page-item disabled">
+                                    <span class="page-link">...</span>
+                                </li>
+                            <?php endif; ?>
+                        <?php endif; ?>
+                        
+                        <?php for ($i = $start_page; $i <= $end_page; $i++): ?>
+                            <?php
+                            $page_url = "?page=$i" . ($url_params ? "&$url_params" : "");
+                            $is_current = $i == $page;
+                            ?>
+                            <li class="page-item <?php echo $is_current ? 'active' : ''; ?>">
+                                <?php if ($is_current): ?>
+                                    <span class="page-link"><?php echo $i; ?></span>
+                                <?php else: ?>
+                                    <a class="page-link" href="<?php echo $page_url; ?>"><?php echo $i; ?></a>
+                                <?php endif; ?>
+                            </li>
+                        <?php endfor; ?>
+                        
+                        <?php
+                        if ($end_page < $total_pages):
+                            $last_url = "?page=$total_pages" . ($url_params ? "&$url_params" : "");
+                        ?>
+                            <?php if ($end_page < $total_pages - 1): ?>
+                                <li class="page-item disabled">
+                                    <span class="page-link">...</span>
+                                </li>
+                            <?php endif; ?>
+                            <li class="page-item">
+                                <a class="page-link" href="<?php echo $last_url; ?>"><?php echo $total_pages; ?></a>
+                            </li>
+                        <?php endif; ?>
+                        
+                        <?php
+                        // Next button
+                        if ($page < $total_pages):
+                            $next_page = $page + 1;
+                            $next_url = "?page=$next_page" . ($url_params ? "&$url_params" : "");
+                        ?>
+                            <li class="page-item">
+                                <a class="page-link" href="<?php echo $next_url; ?>" aria-label="Next">
+                                    <span aria-hidden="true">&raquo;</span>
+                                </a>
+                            </li>
+                        <?php else: ?>
+                            <li class="page-item disabled">
+                                <span class="page-link" aria-label="Next">
+                                    <span aria-hidden="true">&raquo;</span>
+                                </span>
+                            </li>
+                        <?php endif; ?>
+                    </ul>
+                </nav>
+            </div>
+            <?php endif; ?>
         </div>
         
     </div>
@@ -400,89 +565,83 @@ foreach ($employees as $emp) {
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <!-- jQuery -->
     <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
-    <!-- DataTables JS -->
-    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
-    <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
     <?php require_once 'includes/sidebar-scripts.php'; ?>
     <script>
         $(document).ready(function() {
-            // Initialize DataTable
-            var table = $('#employeesTable').DataTable({
-                responsive: true,
-                pageLength: 25,
-                lengthMenu: [[10, 25, 50, -1], [10, 25, 50, "All"]],
-                order: [[0, 'asc']], // Sort by employee number by default
-                searching: true,
-                language: {
-                    lengthMenu: "Show _MENU_ employees per page",
-                    info: "Showing _START_ to _END_ of _TOTAL_ employees",
-                    paginate: {
-                        first: "First",
-                        last: "Last",
-                        next: "Next",
-                        previous: "Previous"
-                    },
-                    emptyTable: "No employees found."
-                },
-                columnDefs: [
-                    {
-                        targets: [5], // Actions column
-                        orderable: false,
-                        searchable: false
-                    }
-                ]
-            });
-
-            // Initialize search from URL parameter
-            var initialSearch = '<?php echo htmlspecialchars($search_filter); ?>';
-            if (initialSearch !== '') {
-                table.search(initialSearch).draw();
-            }
-            
-            // Initialize filters from URL parameters
-            var initialOffice = '<?php echo $office_filter; ?>';
-            var initialStatus = '<?php echo htmlspecialchars($status_filter); ?>';
-            var initialClearance = '<?php echo htmlspecialchars($clearance_filter); ?>';
-            
-            if (initialOffice !== '0') {
-                // Get the office name from the dropdown
-                var officeName = $('#officeFilter option[value="' + initialOffice + '"]').text();
-                table.column(2).search(officeName, true, false).draw();
-            }
-            if (initialStatus !== '') {
-                table.column(3).search(initialStatus, true, false).draw();
-            }
-            if (initialClearance !== '') {
-                table.column(4).search(initialClearance, true, false).draw();
-            }
-            
-            // Filter functionality
-            $('#officeFilter, #statusFilter, #clearanceFilter').on('change', function() {
-                // Get filter values
+            // Search functionality with debounce
+            $('#searchInput').on('keyup change', function() {
+                // Get current URL parameters
+                var urlParams = new URLSearchParams(window.location.search);
+                
+                var search = $(this).val();
+                
+                // Update search parameter
+                if (search) {
+                    urlParams.set('search', search);
+                } else {
+                    urlParams.delete('search');
+                }
+                
+                // Preserve other filter parameters
                 var office = $('#officeFilter').val();
                 var status = $('#statusFilter').val();
                 var clearance = $('#clearanceFilter').val();
                 
-                // Apply filters using DataTables API with regex
+                if (office) urlParams.set('office', office);
+                if (status) urlParams.set('status', status);
+                if (clearance) urlParams.set('clearance', clearance);
+                
+                // Reset to page 1 when searching
+                urlParams.delete('page');
+                
+                // Reload page with search parameter (with debounce)
+                clearTimeout(window.searchTimeout);
+                window.searchTimeout = setTimeout(function() {
+                    window.location.href = window.location.pathname + '?' + urlParams.toString();
+                }, 500);
+            });
+            
+            // Filter functionality
+            $('#officeFilter, #statusFilter, #clearanceFilter').on('change', function() {
+                // Get current URL parameters
+                var urlParams = new URLSearchParams(window.location.search);
+                
+                // Update filter values
+                var office = $('#officeFilter').val();
+                var status = $('#statusFilter').val();
+                var clearance = $('#clearanceFilter').val();
+                var search = $('#searchInput').val();
+                
+                // Set parameters
                 if (office) {
-                    // Get the office name from the dropdown option text
-                    var officeName = $('#officeFilter option:selected').text();
-                    table.column(2).search(officeName, true, false).draw();
+                    urlParams.set('office', office);
                 } else {
-                    table.column(2).search('').draw();
+                    urlParams.delete('office');
                 }
                 
                 if (status) {
-                    table.column(3).search(status, true, false).draw();
+                    urlParams.set('status', status);
                 } else {
-                    table.column(3).search('').draw();
+                    urlParams.delete('status');
                 }
                 
                 if (clearance) {
-                    table.column(4).search(clearance, true, false).draw();
+                    urlParams.set('clearance', clearance);
                 } else {
-                    table.column(4).search('').draw();
+                    urlParams.delete('clearance');
                 }
+                
+                if (search) {
+                    urlParams.set('search', search);
+                } else {
+                    urlParams.delete('search');
+                }
+                
+                // Reset to page 1 when filtering
+                urlParams.delete('page');
+                
+                // Reload page with new parameters
+                window.location.href = window.location.pathname + '?' + urlParams.toString();
             });
         });
 
@@ -504,24 +663,20 @@ foreach ($employees as $emp) {
         
         // Export employees function
         function exportEmployees() {
-            const table = $('#employeesTable').DataTable();
-            let csv = 'Employee No,Name,Email,Phone,Office,Position,Employment Status,Clearance Status,Created At\n';
+            let csv = 'Employee No,Name,Email,Office,Employment Status,Clearance Status\n';
             
-            const data = table.data().toArray();
-            for (let row of data) {
-                const rowData = [
-                    row[0], // Employee No
-                    row[1], // Name
-                    '', // Email (extracted separately)
-                    '', // Phone (not displayed in table)
-                    row[2], // Office
-                    '', // Position (not displayed in table)
-                    row[3], // Employment Status
-                    row[4], // Clearance Status
-                    '' // Created At (not displayed in table)
-                ];
-                csv += rowData.map(cell => `"${cell}"`).join(',') + '\n';
-            }
+            <?php if (!empty($employees)): ?>
+                <?php foreach ($employees as $employee): ?>
+                    csv += `<?php echo 
+                        '"' . addslashes($employee['employee_no'] ?? 'N/A') . '",' .
+                        '"' . addslashes(($employee['firstname'] ?? '') . ' ' . ($employee['lastname'] ?? '')) . '",' .
+                        '"' . addslashes($employee['email'] ?? '') . '",' .
+                        '"' . addslashes($employee['office_name'] ?? 'N/A') . '",' .
+                        '"' . addslashes(ucfirst(str_replace('_', ' ', $employee['employment_status'] ?? 'permanent'))) . '",' .
+                        '"' . addslashes(ucfirst($employee['clearance_status'] ?? 'uncleared')) . '"' 
+                    ; ?>\n`;
+                <?php endforeach; ?>
+            <?php endif; ?>
             
             const blob = new Blob([csv], { type: 'text/csv' });
             const url = window.URL.createObjectURL(blob);
