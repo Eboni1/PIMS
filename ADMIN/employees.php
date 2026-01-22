@@ -38,6 +38,33 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['a
     $employment_status = trim($_POST['employment_status'] ?? 'permanent');
     $clearance_status = trim($_POST['clearance_status'] ?? 'uncleared');
     
+    // Handle profile photo upload
+    $profile_photo = $_POST['current_photo'] ?? '';
+    if (isset($_FILES['profile_photo']) && $_FILES['profile_photo']['error'] == 0) {
+        $allowed_types = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+        $max_size = 5 * 1024 * 1024; // 5MB
+        
+        if (in_array($_FILES['profile_photo']['type'], $allowed_types) && $_FILES['profile_photo']['size'] <= $max_size) {
+            $upload_dir = '../uploads/employees/';
+            if (!is_dir($upload_dir)) {
+                mkdir($upload_dir, 0755, true);
+            }
+            
+            $file_extension = pathinfo($_FILES['profile_photo']['name'], PATHINFO_EXTENSION);
+            $file_name = 'employee_' . $id . '_' . time() . '.' . $file_extension;
+            $upload_path = $upload_dir . $file_name;
+            
+            if (move_uploaded_file($_FILES['profile_photo']['tmp_name'], $upload_path)) {
+                $profile_photo = 'uploads/employees/' . $file_name;
+                
+                // Delete old photo if exists
+                if (!empty($_POST['current_photo']) && file_exists('../' . $_POST['current_photo'])) {
+                    unlink('../' . $_POST['current_photo']);
+                }
+            }
+        }
+    }
+    
     // Validation
     if (empty($firstname)) {
         $message = "First name is required.";
@@ -65,9 +92,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['a
                 $message_type = "danger";
             } else {
                 // Update employee
-                $update_sql = "UPDATE employees SET firstname = ?, lastname = ?, email = ?, phone = ?, office_id = ?, position = ?, employment_status = ?, clearance_status = ? WHERE id = ?";
+                $update_sql = "UPDATE employees SET firstname = ?, lastname = ?, email = ?, phone = ?, office_id = ?, position = ?, employment_status = ?, clearance_status = ?, profile_photo = ? WHERE id = ?";
                 $update_stmt = $conn->prepare($update_sql);
-                $update_stmt->bind_param("sssissssi", $firstname, $lastname, $email, $phone, $office_id, $position, $employment_status, $clearance_status, $id);
+                $update_stmt->bind_param("sssisssssi", $firstname, $lastname, $email, $phone, $office_id, $position, $employment_status, $clearance_status, $profile_photo, $id);
                 
                 if ($update_stmt->execute()) {
                     logSystemAction($_SESSION['user_id'], 'update', 'employees', "Updated employee: $firstname $lastname");
@@ -100,6 +127,28 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['a
     $position = trim($_POST['position'] ?? '');
     $employment_status = trim($_POST['employment_status'] ?? 'permanent');
     $clearance_status = trim($_POST['clearance_status'] ?? 'uncleared');
+    
+    // Handle profile photo upload
+    $profile_photo = null;
+    if (isset($_FILES['profile_photo']) && $_FILES['profile_photo']['error'] == 0) {
+        $allowed_types = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+        $max_size = 5 * 1024 * 1024; // 5MB
+        
+        if (in_array($_FILES['profile_photo']['type'], $allowed_types) && $_FILES['profile_photo']['size'] <= $max_size) {
+            $upload_dir = '../uploads/employees/';
+            if (!is_dir($upload_dir)) {
+                mkdir($upload_dir, 0755, true);
+            }
+            
+            // We'll get the employee ID after insertion, so use a temporary name first
+            $temp_name = 'temp_' . time() . '.' . pathinfo($_FILES['profile_photo']['name'], PATHINFO_EXTENSION);
+            $upload_path = $upload_dir . $temp_name;
+            
+            if (move_uploaded_file($_FILES['profile_photo']['tmp_name'], $upload_path)) {
+                $profile_photo = 'uploads/employees/' . $temp_name;
+            }
+        }
+    }
     
     // Validation
     if (empty($firstname)) {
@@ -141,11 +190,31 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['a
             $employee_no = $prefix . $year . str_pad($new_number, 4, '0', STR_PAD_LEFT);
             
             // Insert employee
-            $insert_sql = "INSERT INTO employees (employee_no, firstname, lastname, email, phone, office_id, position, employment_status, clearance_status, created_at, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)";
+            $insert_sql = "INSERT INTO employees (employee_no, firstname, lastname, email, phone, office_id, position, employment_status, clearance_status, profile_photo, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())";
             $insert_stmt = $conn->prepare($insert_sql);
-            $insert_stmt->bind_param("ssssissssi", $employee_no, $firstname, $lastname, $email, $phone, $office_id, $position, $employment_status, $clearance_status, $_SESSION['user_id']);
+            $insert_stmt->bind_param("ssssissssi", $employee_no, $firstname, $lastname, $email, $phone, $office_id, $position, $employment_status, $clearance_status, $profile_photo);
             
             if ($insert_stmt->execute()) {
+                $employee_id = $conn->insert_id;
+                
+                // Rename photo file with employee ID if photo was uploaded
+                if ($profile_photo && !empty($profile_photo)) {
+                    $old_path = '../' . $profile_photo;
+                    $file_extension = pathinfo($old_path, PATHINFO_EXTENSION);
+                    $new_filename = 'employee_' . $employee_id . '_' . time() . '.' . $file_extension;
+                    $new_path = '../uploads/employees/' . $new_filename;
+                    
+                    if (rename($old_path, $new_path)) {
+                        // Update database with new filename
+                        $update_photo_sql = "UPDATE employees SET profile_photo = ? WHERE id = ?";
+                        $update_photo_stmt = $conn->prepare($update_photo_sql);
+                        $new_photo_path = 'uploads/employees/' . $new_filename;
+                        $update_photo_stmt->bind_param("si", $new_photo_path, $employee_id);
+                        $update_photo_stmt->execute();
+                        $update_photo_stmt->close();
+                    }
+                }
+                
                 logSystemAction($_SESSION['user_id'], 'create', 'employees', "Added new employee: $firstname $lastname ($employee_no)");
                 $_SESSION['message'] = "Employee added successfully! Employee No: $employee_no";
                 $_SESSION['message_type'] = "success";
@@ -525,6 +594,7 @@ $showing_to = min($page * $per_page, $total_records);
                 <table class="table table-hover" id="employeesTable">
                     <thead class="table-light">
                         <tr>
+                            <th>Photo</th>
                             <th>Employee No.</th>
                             <th>Name</th>
                             <th>Office</th>
@@ -537,6 +607,15 @@ $showing_to = min($page * $per_page, $total_records);
                         <?php if (!empty($employees)): ?>
                             <?php foreach ($employees as $employee): ?>
                                 <tr>
+                                    <td>
+                                        <?php if (!empty($employee['profile_photo'])): ?>
+                                            <img src="../<?php echo htmlspecialchars($employee['profile_photo']); ?>" alt="Profile" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;">
+                                        <?php else: ?>
+                                            <div class="avatar-placeholder" style="width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, var(--primary-color), #6c63ff); display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 14px;">
+                                                <?php echo strtoupper(substr($employee['firstname'], 0, 1) . substr($employee['lastname'], 0, 1)); ?>
+                                            </div>
+                                        <?php endif; ?>
+                                    </td>
                                     <td><?php echo htmlspecialchars($employee['employee_no'] ?? 'N/A'); ?></td>
                                     <td>
                                         <?php echo htmlspecialchars($employee['firstname'] . ' ' . $employee['lastname']); ?>
@@ -606,7 +685,7 @@ $showing_to = min($page * $per_page, $total_records);
                             <?php endforeach; ?>
                         <?php else: ?>
                             <tr>
-                                <td colspan="6" class="text-center text-muted py-4">
+                                <td colspan="7" class="text-center text-muted py-4">
                                     <i class="bi bi-people fs-1"></i>
                                     <p class="mt-2">No employees found.</p>
                                 </td>
@@ -737,7 +816,7 @@ $showing_to = min($page * $per_page, $total_records);
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <form id="addEmployeeForm" method="POST" action="employees.php">
+                <form id="addEmployeeForm" method="POST" action="employees.php" enctype="multipart/form-data">
                     <div class="modal-body">
                         <input type="hidden" name="action" value="add">
                         
@@ -765,6 +844,18 @@ $showing_to = min($page * $per_page, $total_records);
                         
                         <div class="row">
                             <div class="col-md-6 mb-3">
+                                <label for="addPhoto" class="form-label">Profile Photo</label>
+                                <input type="file" class="form-control" id="addPhoto" name="profile_photo" accept="image/*">
+                                <small class="text-muted">Allowed: JPG, PNG, GIF (Max 5MB)</small>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="addPosition" class="form-label">Position</label>
+                                <input type="text" class="form-control" id="addPosition" name="position">
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
                                 <label for="addOffice" class="form-label">Office *</label>
                                 <select class="form-select" id="addOffice" name="office_id" required>
                                     <option value="">Select Office</option>
@@ -776,13 +867,6 @@ $showing_to = min($page * $per_page, $total_records);
                                 </select>
                             </div>
                             <div class="col-md-6 mb-3">
-                                <label for="addPosition" class="form-label">Position</label>
-                                <input type="text" class="form-control" id="addPosition" name="position">
-                            </div>
-                        </div>
-                        
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
                                 <label for="addEmploymentStatus" class="form-label">Employment Status *</label>
                                 <select class="form-select" id="addEmploymentStatus" name="employment_status" required>
                                     <option value="permanent">Permanent</option>
@@ -792,12 +876,18 @@ $showing_to = min($page * $per_page, $total_records);
                                     <option value="retired">Retired</option>
                                 </select>
                             </div>
+                        </div>
+                        
+                        <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label for="addClearanceStatus" class="form-label">Clearance Status *</label>
                                 <select class="form-select" id="addClearanceStatus" name="clearance_status" required>
                                     <option value="cleared">Cleared</option>
                                     <option value="uncleared">Uncleared</option>
                                 </select>
+                            </div>
+                            <div class="col-md-6">
+                                <!-- Empty column for balance -->
                             </div>
                         </div>
                     </div>
@@ -822,7 +912,7 @@ $showing_to = min($page * $per_page, $total_records);
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <form id="editEmployeeForm" method="POST" action="employees.php">
+                <form id="editEmployeeForm" method="POST" action="employees.php" enctype="multipart/form-data">
                     <div class="modal-body">
                         <input type="hidden" name="action" value="edit">
                         <input type="hidden" name="id" id="editEmployeeId" value="<?php echo $edit_employee['id'] ?? ''; ?>">
@@ -840,12 +930,30 @@ $showing_to = min($page * $per_page, $total_records);
                         
                         <div class="row">
                             <div class="col-md-6 mb-3">
+                                <label for="editPhone" class="form-label">Phone</label>
+                                <input type="tel" class="form-control" id="editPhone" name="phone" value="<?php echo htmlspecialchars($edit_employee['phone'] ?? ''); ?>">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="editPhoto" class="form-label">Profile Photo</label>
+                                <input type="file" class="form-control" id="editPhoto" name="profile_photo" accept="image/*">
+                                <input type="hidden" name="current_photo" value="<?php echo htmlspecialchars($edit_employee['profile_photo'] ?? ''); ?>">
+                                <small class="text-muted">Allowed: JPG, PNG, GIF (Max 5MB)</small>
+                                <?php if (!empty($edit_employee['profile_photo'])): ?>
+                                    <div class="mt-2">
+                                        <img src="../<?php echo htmlspecialchars($edit_employee['profile_photo']); ?>" alt="Current Photo" style="max-width: 100px; max-height: 100px; border-radius: 8px;">
+                                    </div>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
                                 <label for="editEmail" class="form-label">Email *</label>
                                 <input type="email" class="form-control" id="editEmail" name="email" required value="<?php echo htmlspecialchars($edit_employee['email'] ?? ''); ?>">
                             </div>
                             <div class="col-md-6 mb-3">
-                                <label for="editPhone" class="form-label">Phone</label>
-                                <input type="tel" class="form-control" id="editPhone" name="phone" value="<?php echo htmlspecialchars($edit_employee['phone'] ?? ''); ?>">
+                                <label for="editPosition" class="form-label">Position</label>
+                                <input type="text" class="form-control" id="editPosition" name="position" value="<?php echo htmlspecialchars($edit_employee['position'] ?? ''); ?>">
                             </div>
                         </div>
                         
@@ -861,13 +969,6 @@ $showing_to = min($page * $per_page, $total_records);
                                     <?php endforeach; ?>
                                 </select>
                             </div>
-                            <div class="col-md-6 mb-3">
-                                <label for="editPosition" class="form-label">Position</label>
-                                <input type="text" class="form-control" id="editPosition" name="position" value="<?php echo htmlspecialchars($edit_employee['position'] ?? ''); ?>">
-                            </div>
-                        </div>
-                        
-                        <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label for="editEmploymentStatus" class="form-label">Employment Status *</label>
                                 <select class="form-select" id="editEmploymentStatus" name="employment_status" required>

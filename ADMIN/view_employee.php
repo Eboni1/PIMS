@@ -217,9 +217,13 @@ function getStatusBadgeClass($status, $type = 'employment') {
         <div class="row">
             <div class="col-md-4">
                 <div class="view-card text-center">
-                    <div class="employee-avatar">
-                        <?php echo strtoupper(substr($employee['firstname'], 0, 1) . substr($employee['lastname'], 0, 1)); ?>
-                    </div>
+                    <?php if (!empty($employee['profile_photo'])): ?>
+                        <img src="../<?php echo htmlspecialchars($employee['profile_photo']); ?>" alt="Profile Photo" style="width: 120px; height: 120px; border-radius: 50%; object-fit: cover; margin: 0 auto 1.5rem;">
+                    <?php else: ?>
+                        <div class="employee-avatar">
+                            <?php echo strtoupper(substr($employee['firstname'], 0, 1) . substr($employee['lastname'], 0, 1)); ?>
+                        </div>
+                    <?php endif; ?>
                     <h4 class="mb-1"><?php echo htmlspecialchars($employee['firstname'] . ' ' . $employee['lastname']); ?></h4>
                     <p class="text-muted mb-3"><?php echo htmlspecialchars($employee['position'] ?? 'Not specified'); ?></p>
                     <div class="d-flex justify-content-center gap-2">
