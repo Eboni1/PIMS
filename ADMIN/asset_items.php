@@ -339,9 +339,9 @@ $notag_items = count(array_filter($items, function($item) { return $item['status
                                     <td><?php echo date('M j, Y', strtotime($item['acquisition_date'])); ?></td>
                                     <td><?php echo date('M j, Y', strtotime($item['last_updated'])); ?></td>
                                     <td>
-                                        <button type="button" class="btn btn-outline-info btn-action" title="View Details">
+                                        <a href="view_asset_item.php?id=<?php echo $item['id']; ?>" class="btn btn-outline-info btn-action" title="View Details">
                                             <i class="bi bi-eye"></i>
-                                        </button>
+                                        </a>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
