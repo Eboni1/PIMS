@@ -149,10 +149,10 @@ try {
         $update_tag_stmt->execute();
     }
     
-    // Update asset item status to show tag is pending
-    $update_asset_sql = "UPDATE asset_items SET status = 'pending_tag', last_updated = CURRENT_TIMESTAMP WHERE id = ?";
+    // Update asset item status to show tag is pending and set employee_id
+    $update_asset_sql = "UPDATE asset_items SET status = 'pending_tag', employee_id = ?, last_updated = CURRENT_TIMESTAMP WHERE id = ?";
     $update_asset_stmt = $conn->prepare($update_asset_sql);
-    $update_asset_stmt->bind_param("i", $item_id);
+    $update_asset_stmt->bind_param("ii", $person_accountable, $item_id);
     $update_asset_stmt->execute();
     
     // Commit transaction

@@ -56,13 +56,11 @@ $total_pages = ceil($total_rows / $per_page);
 $sql = "SELECT it.*, 
                e.firstname, e.lastname, e.employee_no,
                ac.category_name, ac.category_code,
-               creator.first_name as creator_firstname, creator.last_name as creator_lastname,
-               approver.first_name as approver_firstname, approver.last_name as approver_lastname
+               creator.first_name as creator_firstname, creator.last_name as creator_lastname
         FROM inventory_tags it
         LEFT JOIN employees e ON it.person_accountable = e.id
         LEFT JOIN asset_categories ac ON it.category_id = ac.id
         LEFT JOIN users creator ON it.created_by = creator.id
-        LEFT JOIN users approver ON it.approved_by = approver.id
         $where_clause
         ORDER BY it.created_at DESC
         LIMIT ? OFFSET ?";
