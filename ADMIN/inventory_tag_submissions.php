@@ -9,7 +9,6 @@ if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['system_admin'
 }
 
 // Get filter parameters
-$status_filter = $_GET['status'] ?? 'all';
 $search = $_GET['search'] ?? '';
 
 // Build WHERE clause
@@ -17,21 +16,11 @@ $where_conditions = [];
 $params = [];
 $types = '';
 
-if ($status_filter !== 'all') {
-    $where_conditions[] = "it.status = ?";
-    $params[] = $status_filter;
-    $types .= 's';
-}
-
 if (!empty($search)) {
-    $where_conditions[] = "(it.tag_number LIKE ? OR it.property_number LIKE ? OR it.item_description LIKE ? OR e.firstname LIKE ? OR e.lastname LIKE ?)";
+    $where_conditions[] = "(it.tag_number LIKE ? OR it.property_number LIKE ? OR it.item_description LIKE ? OR e.firstname LIKE ? OR e.lastname LIKE ? OR ac.category_name LIKE ?)";
     $search_param = "%$search%";
-    $params[] = $search_param;
-    $params[] = $search_param;
-    $params[] = $search_param;
-    $params[] = $search_param;
-    $params[] = $search_param;
-    $types .= 'sssss';
+    $params = array_fill(0, 6, $search_param);
+    $types = str_repeat('s', 6);
 }
 
 $where_clause = !empty($where_conditions) ? 'WHERE ' . implode(' AND ', $where_conditions) : '';
@@ -76,13 +65,7 @@ $stmt->execute();
 $result = $stmt->get_result();
 
 // Get statistics
-$stats_sql = "SELECT 
-                COUNT(*) as total,
-                SUM(CASE WHEN status = 'Pending' THEN 1 ELSE 0 END) as pending,
-                SUM(CASE WHEN status = 'Approved' THEN 1 ELSE 0 END) as approved,
-                SUM(CASE WHEN status = 'Rejected' THEN 1 ELSE 0 END) as rejected,
-                SUM(CASE WHEN status = 'Processed' THEN 1 ELSE 0 END) as processed
-              FROM inventory_tags";
+$stats_sql = "SELECT COUNT(*) as total FROM inventory_tags";
 $stats_result = $conn->query($stats_sql);
 $stats = $stats_result->fetch_assoc();
 ?>
@@ -194,50 +177,11 @@ $stats = $stats_result->fetch_assoc();
                         <div class="stats-card">
                             <div class="d-flex align-items-center">
                                 <div class="flex-grow-1">
-                                    <h6 class="text-muted mb-1">Total Submissions</h6>
+                                    <h6 class="text-muted mb-1">Total Tags Created</h6>
                                     <div class="stats-number"><?php echo $stats['total']; ?></div>
                                 </div>
                                 <div class="text-primary">
-                                    <i class="bi bi-file-earmark-text" style="font-size: 2rem;"></i>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="stats-card">
-                            <div class="d-flex align-items-center">
-                                <div class="flex-grow-1">
-                                    <h6 class="text-muted mb-1">Pending</h6>
-                                    <div class="stats-number text-warning"><?php echo $stats['pending']; ?></div>
-                                </div>
-                                <div class="text-warning">
-                                    <i class="bi bi-clock-history" style="font-size: 2rem;"></i>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="stats-card">
-                            <div class="d-flex align-items-center">
-                                <div class="flex-grow-1">
-                                    <h6 class="text-muted mb-1">Approved</h6>
-                                    <div class="stats-number text-success"><?php echo $stats['approved']; ?></div>
-                                </div>
-                                <div class="text-success">
-                                    <i class="bi bi-check-circle" style="font-size: 2rem;"></i>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="stats-card">
-                            <div class="d-flex align-items-center">
-                                <div class="flex-grow-1">
-                                    <h6 class="text-muted mb-1">Processed</h6>
-                                    <div class="stats-number text-info"><?php echo $stats['processed']; ?></div>
-                                </div>
-                                <div class="text-info">
-                                    <i class="bi bi-gear" style="font-size: 2rem;"></i>
+                                    <i class="bi bi-tags" style="font-size: 2rem;"></i>
                                 </div>
                             </div>
                         </div>
@@ -248,22 +192,13 @@ $stats = $stats_result->fetch_assoc();
                 <div class="submissions-table">
                     <div class="p-3 border-bottom">
                         <div class="row align-items-center">
-                            <div class="col-md-4">
+                            <div class="col-md-6">
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="bi bi-search"></i></span>
                                     <input type="text" class="form-control" placeholder="Search tags..." value="<?php echo htmlspecialchars($search); ?>" id="searchInput">
                                 </div>
                             </div>
-                            <div class="col-md-3">
-                                <select class="form-select" id="statusFilter">
-                                    <option value="all" <?php echo $status_filter === 'all' ? 'selected' : ''; ?>>All Status</option>
-                                    <option value="Pending" <?php echo $status_filter === 'Pending' ? 'selected' : ''; ?>>Pending</option>
-                                    <option value="Approved" <?php echo $status_filter === 'Approved' ? 'selected' : ''; ?>>Approved</option>
-                                    <option value="Rejected" <?php echo $status_filter === 'Rejected' ? 'selected' : ''; ?>>Rejected</option>
-                                    <option value="Processed" <?php echo $status_filter === 'Processed' ? 'selected' : ''; ?>>Processed</option>
-                                </select>
-                            </div>
-                            <div class="col-md-5 text-end">
+                            <div class="col-md-6 text-end">
                                 <button class="btn btn-outline-primary" onclick="exportSubmissions()">
                                     <i class="bi bi-download"></i> Export
                                 </button>
@@ -281,7 +216,6 @@ $stats = $stats_result->fetch_assoc();
                                     <th>Item Description</th>
                                     <th>Category</th>
                                     <th>Person Accountable</th>
-                                    <th>Status</th>
                                     <th>Submitted Date</th>
                                     <th>Actions</th>
                                 </tr>
@@ -301,37 +235,19 @@ $stats = $stats_result->fetch_assoc();
                                             <td>
                                                 <?php echo htmlspecialchars($row['employee_no'] . ' - ' . $row['lastname'] . ', ' . $row['firstname']); ?>
                                             </td>
-                                            <td>
-                                                <span class="status-badge status-<?php echo strtolower($row['status']); ?>">
-                                                    <?php echo htmlspecialchars($row['status']); ?>
-                                                </span>
-                                            </td>
                                             <td><?php echo date('M j, Y g:i A', strtotime($row['created_at'])); ?></td>
                                             <td>
                                                 <div class="action-buttons">
                                                     <button class="btn btn-sm btn-outline-primary" onclick="viewSubmission(<?php echo $row['id']; ?>)">
                                                         <i class="bi bi-eye"></i> View
                                                     </button>
-                                                    <?php if ($row['status'] === 'Pending'): ?>
-                                                        <button class="btn btn-sm btn-success" onclick="approveSubmission(<?php echo $row['id']; ?>)">
-                                                            <i class="bi bi-check"></i> Approve
-                                                        </button>
-                                                        <button class="btn btn-sm btn-danger" onclick="rejectSubmission(<?php echo $row['id']; ?>)">
-                                                            <i class="bi bi-x"></i> Reject
-                                                        </button>
-                                                    <?php endif; ?>
-                                                    <?php if ($row['status'] === 'Approved'): ?>
-                                                        <button class="btn btn-sm btn-info" onclick="processSubmission(<?php echo $row['id']; ?>)">
-                                                            <i class="bi bi-gear"></i> Process
-                                                        </button>
-                                                    <?php endif; ?>
                                                 </div>
                                             </td>
                                         </tr>
                                     <?php endwhile; ?>
                                 <?php else: ?>
                                     <tr>
-                                        <td colspan="8" class="text-center py-4">
+                                        <td colspan="7" class="text-center py-4">
                                             <i class="bi bi-inbox" style="font-size: 2rem; color: #6c757d;"></i>
                                             <p class="text-muted mt-2">No tag submissions found</p>
                                         </td>
@@ -348,7 +264,7 @@ $stats = $stats_result->fetch_assoc();
                                 <ul class="pagination mb-0 justify-content-center">
                                     <?php for ($i = 1; $i <= $total_pages; $i++): ?>
                                         <li class="page-item <?php echo $i === $page ? 'active' : ''; ?>">
-                                            <a class="page-link" href="?page=<?php echo $i; ?>&status=<?php echo urlencode($status_filter); ?>&search=<?php echo urlencode($search); ?>">
+                                            <a class="page-link" href="?page=<?php echo $i; ?>&search=<?php echo urlencode($search); ?>">
                                                 <?php echo $i; ?>
                                             </a>
                                         </li>
@@ -373,51 +289,20 @@ $stats = $stats_result->fetch_assoc();
         document.getElementById('searchInput').addEventListener('keyup', function(e) {
             if (e.key === 'Enter') {
                 const search = this.value;
-                const status = document.getElementById('statusFilter').value;
-                window.location.href = `?search=${encodeURIComponent(search)}&status=${encodeURIComponent(status)}`;
+                window.location.href = `?search=${encodeURIComponent(search)}`;
             }
         });
-        
-        // Status filter
-        document.getElementById('statusFilter').addEventListener('change', function() {
-            const status = this.value;
-            const search = document.getElementById('searchInput').value;
-            window.location.href = `?search=${encodeURIComponent(search)}&status=${encodeURIComponent(status)}`;
-        });
-        
-        // View submission
-        function viewSubmission(id) {
-            // Implement view modal or redirect to view page
-            window.location.href = `view_tag_submission.php?id=${id}`;
-        }
-        
-        // Approve submission
-        function approveSubmission(id) {
-            if (confirm('Are you sure you want to approve this tag submission?')) {
-                window.location.href = `process_tag_approval.php?action=approve&id=${id}`;
-            }
-        }
-        
-        // Reject submission
-        function rejectSubmission(id) {
-            const reason = prompt('Please provide a reason for rejection:');
-            if (reason) {
-                window.location.href = `process_tag_approval.php?action=reject&id=${id}&reason=${encodeURIComponent(reason)}`;
-            }
-        }
-        
-        // Process submission
-        function processSubmission(id) {
-            if (confirm('Are you sure you want to process this approved tag? This will update the asset item with the tag information.')) {
-                window.location.href = `process_tag_approval.php?action=process&id=${id}`;
-            }
-        }
         
         // Export submissions
         function exportSubmissions() {
-            const status = document.getElementById('statusFilter').value;
             const search = document.getElementById('searchInput').value;
-            window.location.href = `export_tag_submissions.php?status=${encodeURIComponent(status)}&search=${encodeURIComponent(search)}`;
+            window.location.href = `export_tag_submissions.php?search=${encodeURIComponent(search)}`;
+        }
+        
+        // View submission
+        function viewSubmission(id) {
+            // Implementation for viewing submission details
+            window.location.href = `view_tag_submission.php?id=${id}`;
         }
     </script>
 </body>

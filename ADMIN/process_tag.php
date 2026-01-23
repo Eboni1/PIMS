@@ -83,12 +83,32 @@ try {
                    date_counted = ?,
                    image = ?,
                    employee_id = ?, 
-                   status = 'available',
+                   category_id = ?,
+                   status = 'serviceable',
                    last_updated = CURRENT_TIMESTAMP
                    WHERE id = ?";
     $update_stmt = $conn->prepare($update_sql);
-    $update_stmt->bind_param("ssssii", $property_no, $inventory_tag, $date_counted, $image_filename, $person_accountable, $item_id);
+    $update_stmt->bind_param("ssssiii", $property_no, $inventory_tag, $date_counted, $image_filename, $person_accountable, $category_id, $item_id);
     $update_stmt->execute();
+    
+    // Also update the assets table with the category_id
+    $get_asset_sql = "SELECT asset_id FROM asset_items WHERE id = ?";
+    $get_asset_stmt = $conn->prepare($get_asset_sql);
+    $get_asset_stmt->bind_param("i", $item_id);
+    $get_asset_stmt->execute();
+    $asset_result = $get_asset_stmt->get_result();
+    $asset_row = $asset_result->fetch_assoc();
+    
+    if ($asset_row && $asset_row['asset_id']) {
+        $asset_id = $asset_row['asset_id'];
+        $update_assets_sql = "UPDATE assets SET 
+                              asset_categories_id = ?,
+                              updated_at = CURRENT_TIMESTAMP
+                              WHERE id = ?";
+        $update_assets_stmt = $conn->prepare($update_assets_sql);
+        $update_assets_stmt->bind_param("ii", $category_id, $asset_id);
+        $update_assets_stmt->execute();
+    }
     
     // Update tag format current number if tag format is used
     if ($tag_format_id > 0) {

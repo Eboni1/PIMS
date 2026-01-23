@@ -149,8 +149,8 @@ try {
         $update_tag_stmt->execute();
     }
     
-    // Update asset item status to show tag is pending and set employee_id
-    $update_asset_sql = "UPDATE asset_items SET status = 'pending_tag', employee_id = ?, last_updated = CURRENT_TIMESTAMP WHERE id = ?";
+    // Update asset item status to serviceable and set employee_id
+    $update_asset_sql = "UPDATE asset_items SET status = 'serviceable', employee_id = ?, last_updated = CURRENT_TIMESTAMP WHERE id = ?";
     $update_asset_stmt = $conn->prepare($update_asset_sql);
     $update_asset_stmt->bind_param("ii", $person_accountable, $item_id);
     $update_asset_stmt->execute();
@@ -158,7 +158,7 @@ try {
     // Commit transaction
     $conn->commit();
     
-    $_SESSION['success'] = 'Tag submitted successfully! Your submission is now pending approval.';
+    $_SESSION['success'] = 'Asset tag created successfully!';
     
     // Redirect to tag submissions page
     header('Location: inventory_tag_submissions.php');

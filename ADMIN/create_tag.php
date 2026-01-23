@@ -323,7 +323,7 @@ $category_fields = [
 
         <!-- Tag Creation Form -->
         <div class="form-container">
-            <form method="POST" action="process_tag_submission.php" id="tagForm" enctype="multipart/form-data">
+            <form method="POST" action="process_tag.php" id="tagForm" enctype="multipart/form-data">
                 <input type="hidden" name="item_id" value="<?php echo $item_id; ?>">
                 <input type="hidden" name="tag_format_id" value="<?php echo $tag_format['id'] ?? ''; ?>">
                 <input type="hidden" name="current_number" value="<?php echo $tag_format['current_number'] ?? ''; ?>">
