@@ -35,6 +35,52 @@ if ($result && $row = $result->fetch_assoc()) {
     $par_config = $row;
 }
 
+// Get Property Number configuration for JavaScript
+$property_config = null;
+$result = $conn->query("SELECT * FROM tag_formats WHERE tag_type = 'property_no' AND status = 'active'");
+if ($result && $row = $result->fetch_assoc()) {
+    $property_config = $row;
+}
+
+// Generate initial property number for display
+$initial_property_number = '';
+if ($property_config) {
+    $current_number = $property_config['current_number'];
+    $next_number = $current_number + 1;
+    
+    // Build the property number from components
+    $components = json_decode($property_config['format_components'], true);
+    // Handle double-encoded JSON
+    if (is_string($components)) {
+        $components = json_decode($components, true);
+    }
+    
+    if (is_array($components) && !empty($components)) {
+        $parts = [];
+        
+        foreach ($components as $component) {
+            switch($component['type']) {
+                case 'text':
+                    $parts[] = $component['value'] ?? '';
+                    break;
+                case 'digits':
+                    $component_digits = $component['digits'] ?? $property_config['digits'] ?? 4;
+                    $number = str_pad($next_number, $component_digits, '0', STR_PAD_LEFT);
+                    $parts[] = $number;
+                    break;
+                case 'year':
+                    $parts[] = date('Y');
+                    break;
+                case 'month':
+                    $parts[] = date('m');
+                    break;
+            }
+        }
+        
+        $initial_property_number = implode($property_config['separator'] ?? '', $parts);
+    }
+}
+
 // Common units for dropdown
 $common_units = [
     'Pieces',
@@ -308,7 +354,7 @@ if ($result && $row = $result->fetch_assoc()) {
                                                 </select>
                                             </td>
                                             <td><input type="text" class="form-control form-control-sm" name="description[]" required></td>
-                                            <td><input type="text" class="form-control form-control-sm" name="property_number[]"></td>
+                                            <td><input type="text" class="form-control form-control-sm" name="property_number[]" id="initialPropertyNumber" value="<?php echo htmlspecialchars($initial_property_number); ?>" placeholder="Auto-generated"></td>
                                             <td><input type="date" class="form-control form-control-sm" name="date_acquired[]"></td>
                                             <td><input type="number" step="0.01" class="form-control form-control-sm" name="amount[]" required></td>
                                             <td><button type="button" class="btn btn-sm btn-danger" onclick="removeRow(this)"><i class="bi bi-trash"></i></button></td>
@@ -358,6 +404,43 @@ if ($result && $row = $result->fetch_assoc()) {
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        // Configuration from PHP
+        const parConfig = <?php echo json_encode($par_config); ?>;
+        const propertyConfig = <?php echo json_encode($property_config); ?>;
+        
+        function generatePropertyNumber() {
+            if (!propertyConfig) return '';
+            
+            // Get current number and increment it
+            const currentNumber = propertyConfig.current_number || 0;
+            const nextNumber = currentNumber + 1;
+            
+            // Build the property number from components
+            const components = JSON.parse(propertyConfig.format_components || '[]');
+            const parts = [];
+            
+            components.forEach(component => {
+                switch(component.type) {
+                    case 'text':
+                        parts.push(component.value || '');
+                        break;
+                    case 'digits':
+                        const digits = component.digits || propertyConfig.digits || 4;
+                        const number = String(nextNumber).padStart(digits, '0');
+                        parts.push(number);
+                        break;
+                    case 'year':
+                        parts.push(new Date().getFullYear());
+                        break;
+                    case 'month':
+                        parts.push(String(new Date().getMonth() + 1).padStart(2, '0'));
+                        break;
+                }
+            });
+            
+            return parts.join(propertyConfig.separator || '');
+        }
+        
         function addRow() {
             const table = document.getElementById('itemsTable').getElementsByTagName('tbody')[0];
             const newRow = table.insertRow();
@@ -371,11 +454,14 @@ if ($result && $row = $result->fetch_assoc()) {
                 echo json_encode($options);
             ?>;
             
+            // Generate auto property number for new row
+            const autoPropertyNumber = generatePropertyNumber();
+            
             const cells = [
                 '<input type="number" class="form-control form-control-sm" name="quantity[]" required onchange="calculateAmount(this)">',
                 '<select class="form-select form-select-sm" name="unit[]" required>' + unitOptions + '</select>',
                 '<input type="text" class="form-control form-control-sm" name="description[]" required>',
-                '<input type="text" class="form-control form-control-sm" name="property_number[]">',
+                '<input type="text" class="form-control form-control-sm" name="property_number[]" value="' + autoPropertyNumber + '" placeholder="Auto-generated">',
                 '<input type="date" class="form-control form-control-sm" name="date_acquired[]">',
                 '<input type="number" step="0.01" class="form-control form-control-sm" name="amount[]" required>',
                 '<button type="button" class="btn btn-sm btn-danger" onclick="removeRow(this)"><i class="bi bi-trash"></i></button>'
@@ -386,6 +472,20 @@ if ($result && $row = $result->fetch_assoc()) {
                 cell.innerHTML = cellHtml;
             });
         }
+        
+        // Initialize the form with auto-generated property numbers
+        function initializeForm() {
+            // Set initial property number
+            const initialPropertyField = document.getElementById('initialPropertyNumber');
+            if (initialPropertyField && !initialPropertyField.value) {
+                initialPropertyField.value = generatePropertyNumber();
+            }
+        }
+        
+        // Initialize when document is ready
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeForm();
+        });
         
         function removeRow(button) {
             const row = button.closest('tr');

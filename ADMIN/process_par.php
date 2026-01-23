@@ -44,6 +44,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             throw new Exception('All required fields must be filled');
         }
         
+        // Validate amount fields - each item must be above 50,000
+        foreach ($amounts as $index => $amount) {
+            if (!empty($amount) && floatval($amount) <= 50000) {
+                throw new Exception("Item " . ($index + 1) . ": Amount must be above ₱50,000. Current amount: ₱" . number_format(floatval($amount), 2));
+            }
+        }
+        
         // Check if we should increment the PAR counter
         if (isset($_POST['increment_par_counter']) && $_POST['increment_par_counter'] == '1') {
             // Generate the actual PAR number (this increments the counter)
@@ -156,6 +163,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         // Commit transaction
         $conn->commit();
+        
+        // Update property number counter if property numbers were used
+        $has_property_numbers = false;
+        foreach ($property_numbers as $property_number) {
+            if (!empty($property_number)) {
+                $has_property_numbers = true;
+                break;
+            }
+        }
+        
+        if ($has_property_numbers) {
+            // Update the property number counter
+            $update_counter = $conn->prepare("UPDATE tag_formats SET current_number = current_number + 1 WHERE tag_type = 'property_no' AND status = 'active'");
+            $update_counter->execute();
+            $update_counter->close();
+        }
         
         // Log the action
         logSystemAction($_SESSION['user_id'], 'Created PAR form', 'forms', "PAR No: $par_no, Entity: $entity_name");
