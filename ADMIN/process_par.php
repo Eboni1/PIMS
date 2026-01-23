@@ -149,7 +149,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     // If property number is provided and this is the first item, assign it
                     if (!empty($property_number) && $item_num == 1) {
                         // Update the asset item with property number if the column exists
-                        $update_stmt = $conn->prepare("UPDATE asset_items SET property_number = ? WHERE id = ?");
+                        $update_stmt = $conn->prepare("UPDATE asset_items SET property_no = ? WHERE id = ?");
                         if ($update_stmt) {
                             $update_stmt->bind_param("si", $property_number, $asset_item_id);
                             $update_stmt->execute();
