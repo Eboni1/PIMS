@@ -117,6 +117,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if (!$asset_item_stmt->execute()) {
                         throw new Exception('Failed to save asset item ' . $item_num . ': ' . $asset_item_stmt->error);
                     }
+                    
+                    // Get the asset_item_id for history logging
+                    $asset_item_id = $asset_item_stmt->insert_id;
+                    
+                    // Log asset item creation in history
+                    $ics_details = "Created via ICS form $ics_no - Entity: $entity_name, Item No: {$items[$i]}, Quantity: 1, Unit: {$units[$i]}, Unit Cost: ₱" . number_format($unit_cost, 2);
+                    $history_sql = "INSERT INTO asset_item_history (item_id, action, details, created_by, created_at) VALUES (?, 'ICS Created', ?, ?, CURRENT_TIMESTAMP)";
+                    $history_stmt = $conn->prepare($history_sql);
+                    $history_stmt->bind_param("isi", $asset_item_id, $ics_details, $_SESSION['user_id']);
+                    $history_stmt->execute();
+                    $history_stmt->close();
                 }
                 $asset_item_stmt->close();
             }

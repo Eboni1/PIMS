@@ -146,6 +146,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     // Get the asset_item_id for potential property number assignment
                     $asset_item_id = $conn->insert_id;
                     
+                    // Log asset item creation in history
+                    $par_details = "Created via PAR form $par_no - Entity: $entity_name, Quantity: $quantity, Unit: {$units[$i]}, Amount: ₱" . number_format($amount, 2);
+                    $history_sql = "INSERT INTO asset_item_history (item_id, action, details, created_by, created_at) VALUES (?, 'PAR Created', ?, ?, CURRENT_TIMESTAMP)";
+                    $history_stmt = $conn->prepare($history_sql);
+                    $history_stmt->bind_param("isi", $asset_item_id, $par_details, $_SESSION['user_id']);
+                    $history_stmt->execute();
+                    $history_stmt->close();
+                    
                     // If property number is provided and this is the first item, assign it
                     if (!empty($property_number) && $item_num == 1) {
                         // Update the asset item with property number if the column exists

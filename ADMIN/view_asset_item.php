@@ -239,6 +239,34 @@ $status_display = formatStatus($item['status']);
             justify-content: center;
             margin: 0 auto;
         }
+        
+        .asset-image-container {
+            position: relative;
+            display: inline-block;
+        }
+        
+        .asset-image-container img {
+            border: 2px solid #e9ecef;
+            border-radius: var(--border-radius-md);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        
+        .asset-image-container img:hover {
+            transform: scale(1.02);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+        
+        .no-image-placeholder {
+            border: 2px dashed #dee2e6;
+            border-radius: var(--border-radius-md);
+            padding: 20px;
+            background-color: #f8f9fa;
+            display: inline-block;
+        }
+        
+        .no-image-placeholder svg {
+            opacity: 0.5;
+        }
     </style>
 </head>
 <body>
@@ -627,6 +655,36 @@ $status_display = formatStatus($item['status']);
             
             <!-- Sidebar Column -->
             <div class="col-lg-4">
+                <!-- Asset Image -->
+                <div class="detail-card text-center">
+                    <h5 class="mb-3"><i class="bi bi-image"></i> Asset Image</h5>
+                    <div class="asset-image-container mb-3">
+                        <?php if (!empty($item['image'])): ?>
+                            <img src="../uploads/asset_images/<?php echo htmlspecialchars($item['image']); ?>" 
+                                 alt="Asset Image" 
+                                 class="img-fluid rounded shadow-sm"
+                                 style="max-height: 300px; width: auto; object-fit: cover;"
+                                 onerror="this.onerror=null; this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjMwMCIgdmlld0JveD0iMCAwIDMwMCAzMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIzMDAiIGhlaWdodD0iMzAwIiBmaWxsPSIjRjVGNUY1Ii8+CjxwYXRoIGQ9Ik0xMjUgMTIwSDE3NVYxNzVIMTI1VjEyMFoiIGZpbGw9IiNEMUQ1REIiLz4KPHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEwIDIwQzEwIDIyLjIwOTEgMTEuNzkwOSAyNCAxNCAyNEgyNkMyOC4yMDkxIDI0IDMwIDIyLjIwOTEgMzAgMjBWMzBIMTBWMjBaTTEwIDEwQzEwIDEyLjIwOTEgMTEuNzkwOSAxNCAxNCAxNEgyNkMyOC4yMDkxIDE0IDMwIDEyLjIwOTEgMzAgMTBWMTBIMTBaIiBmaWxsPSIjRDRERDREIi8+Cjwvc3ZnPgo8L3N2Zz4K';">
+                            <div class="mt-2">
+                                <small class="text-muted">Image uploaded</small>
+                            </div>
+                        <?php else: ?>
+                            <div class="no-image-placeholder">
+                                <svg width="150" height="150" viewBox="0 0 150 150" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <rect width="150" height="150" fill="#F5F5F5"/>
+                                    <path d="M62.5 60H87.5V87.5H62.5V60Z" fill="#D1D5DB"/>
+                                    <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" x="55" y="55">
+                                        <path d="M10 20C10 22.2091 11.7909 24 14 24H26C28.2091 24 30 22.2091 30 20V30H10V20ZM10 10C10 12.2091 11.7909 14 14 14H26C28.2091 14 30 12.2091 30 10V10H10V10Z" fill="#D4D4D4"/>
+                                    </svg>
+                                </svg>
+                                <div class="mt-2">
+                                    <small class="text-muted">No image available</small>
+                                </div>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                
                 <!-- QR Code -->
                 <div class="detail-card text-center">
                     <h5 class="mb-3"><i class="bi bi-qr-code"></i> QR Code</h5>
