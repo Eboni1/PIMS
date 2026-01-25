@@ -387,7 +387,7 @@ $status_display = formatStatus($item['status']);
                     </div>
                     
                     <!-- Computer Equipment Specific Fields -->
-                    <?php if ($item['category_code'] === 'CE' && ($item['processor'] || $item['ram_capacity'] || $item['storage_capacity'] || $item['operating_system'] || $item['computer_serial_number'])): ?>
+                    <?php if ($item['category_code'] === 'CE' || $item['category_code'] === 'ITS'): ?>
                     <div class="detail-section">
                         <h5 class="mb-3"><i class="bi bi-cpu"></i> Computer Equipment Specifications</h5>
                         <div class="row">
@@ -424,7 +424,7 @@ $status_display = formatStatus($item['status']);
                     <?php endif; ?>
                     
                     <!-- Vehicles Specific Fields -->
-                    <?php if ($item['category_code'] === 'VH' && ($item['vehicle_brand'] || $item['vehicle_model'] || $item['plate_number'])): ?>
+                    <?php if ($item['category_code'] === 'VH'): ?>
                     <div class="detail-section">
                         <h5 class="mb-3"><i class="bi bi-truck"></i> Vehicle Specifications</h5>
                         <div class="row">
@@ -461,7 +461,7 @@ $status_display = formatStatus($item['status']);
                     <?php endif; ?>
                     
                     <!-- Furniture & Fixtures Specific Fields -->
-                    <?php if ($item['category_code'] === 'FF' && ($item['material'] || $item['furniture_dimensions'] || $item['furniture_manufacturer'])): ?>
+                    <?php if ($item['category_code'] === 'FF'): ?>
                     <div class="detail-section">
                         <h5 class="mb-3"><i class="bi bi-lamp"></i> Furniture & Fixtures Specifications</h5>
                         <div class="row">
@@ -490,7 +490,7 @@ $status_display = formatStatus($item['status']);
                     <?php endif; ?>
                     
                     <!-- Machinery & Equipment Specific Fields -->
-                    <?php if ($item['category_code'] === 'ME' && ($item['machine_type'] || $item['machinery_manufacturer'] || $item['model_number'])): ?>
+                    <?php if ($item['category_code'] === 'ME'): ?>
                     <div class="detail-section">
                         <h5 class="mb-3"><i class="bi bi-gear"></i> Machinery & Equipment Specifications</h5>
                         <div class="row">
@@ -527,7 +527,7 @@ $status_display = formatStatus($item['status']);
                     <?php endif; ?>
                     
                     <!-- Office Equipment Specific Fields -->
-                    <?php if ($item['category_code'] === 'OE' && ($item['office_brand'] || $item['office_model'] || $item['office_serial_number'])): ?>
+                    <?php if ($item['category_code'] === 'OE'): ?>
                     <div class="detail-section">
                         <h5 class="mb-3"><i class="bi bi-printer"></i> Office Equipment Specifications</h5>
                         <div class="row">
@@ -552,7 +552,7 @@ $status_display = formatStatus($item['status']);
                     <?php endif; ?>
                     
                     <!-- Software Specific Fields -->
-                    <?php if ($item['category_code'] === 'SW' && ($item['software_name'] || $item['version'])): ?>
+                    <?php if ($item['category_code'] === 'SW'): ?>
                     <div class="detail-section">
                         <h5 class="mb-3"><i class="bi bi-window"></i> Software Specifications</h5>
                         <div class="row">
@@ -581,7 +581,7 @@ $status_display = formatStatus($item['status']);
                     <?php endif; ?>
                     
                     <!-- Land Specific Fields -->
-                    <?php if ($item['category_code'] === 'LD' && ($item['lot_area'] || $item['land_address'])): ?>
+                    <?php if ($item['category_code'] === 'LD'): ?>
                     <div class="detail-section">
                         <h5 class="mb-3"><i class="bi bi-map"></i> Land Specifications</h5>
                         <div class="row">
