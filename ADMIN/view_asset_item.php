@@ -25,6 +25,12 @@ $item_sql = "SELECT ai.*,
                    o.office_name,
                    comp.processor, comp.ram_capacity, comp.storage_type, comp.storage_capacity, 
                    comp.operating_system, comp.serial_number as computer_serial_number,
+                   veh.brand as vehicle_brand, veh.model as vehicle_model, veh.plate_number, veh.color, veh.engine_number, veh.chassis_number, veh.year_manufactured,
+                   furn.material, furn.dimensions as furniture_dimensions, furn.color as furniture_color, furn.manufacturer as furniture_manufacturer,
+                   mach.machine_type, mach.manufacturer as machinery_manufacturer, mach.model_number, mach.capacity as machinery_capacity, mach.power_requirements, mach.serial_number as machinery_serial_number,
+                   oe.brand as office_brand, oe.model as office_model, oe.serial_number as office_serial_number,
+                   sw.software_name, sw.version, sw.license_key, sw.license_expiry,
+                   land.lot_area, land.address as land_address, land.tax_declaration_number,
                    e.employee_no, e.firstname, e.lastname, e.email,
                    ics.ics_no,
                    par.par_no
@@ -33,6 +39,12 @@ $item_sql = "SELECT ai.*,
             LEFT JOIN asset_categories ac ON a.asset_categories_id = ac.id 
             LEFT JOIN offices o ON ai.office_id = o.id 
             LEFT JOIN asset_computers comp ON ai.id = comp.asset_item_id
+            LEFT JOIN asset_vehicles veh ON ai.id = veh.asset_item_id
+            LEFT JOIN asset_furniture furn ON ai.id = furn.asset_item_id
+            LEFT JOIN asset_machinery mach ON ai.id = mach.asset_item_id
+            LEFT JOIN asset_office_equipment oe ON ai.id = oe.asset_item_id
+            LEFT JOIN asset_software sw ON ai.id = sw.asset_item_id
+            LEFT JOIN asset_land land ON ai.id = land.asset_item_id
             LEFT JOIN employees e ON ai.employee_id = e.id 
             LEFT JOIN ics_forms ics ON ai.ics_id = ics.id 
             LEFT JOIN par_forms par ON ai.par_id = par.id 
@@ -405,6 +417,188 @@ $status_display = formatStatus($item['status']);
                                 <div class="mb-3">
                                     <div class="detail-label">Storage Type</div>
                                     <div class="detail-value"><?php echo $item['storage_type'] ? htmlspecialchars(ucfirst($item['storage_type'])) : '<span class="text-muted">Not specified</span>'; ?></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <?php endif; ?>
+                    
+                    <!-- Vehicles Specific Fields -->
+                    <?php if ($item['category_code'] === 'VH' && ($item['vehicle_brand'] || $item['vehicle_model'] || $item['plate_number'])): ?>
+                    <div class="detail-section">
+                        <h5 class="mb-3"><i class="bi bi-truck"></i> Vehicle Specifications</h5>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <div class="detail-label">Brand</div>
+                                    <div class="detail-value"><?php echo $item['vehicle_brand'] ? htmlspecialchars($item['vehicle_brand']) : '<span class="text-muted">Not specified</span>'; ?></div>
+                                </div>
+                                <div class="mb-3">
+                                    <div class="detail-label">Model</div>
+                                    <div class="detail-value"><?php echo $item['vehicle_model'] ? htmlspecialchars($item['vehicle_model']) : '<span class="text-muted">Not specified</span>'; ?></div>
+                                </div>
+                                <div class="mb-3">
+                                    <div class="detail-label">Plate Number</div>
+                                    <div class="detail-value"><?php echo $item['plate_number'] ? htmlspecialchars($item['plate_number']) : '<span class="text-muted">Not specified</span>'; ?></div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <div class="detail-label">Color</div>
+                                    <div class="detail-value"><?php echo $item['color'] ? htmlspecialchars($item['color']) : '<span class="text-muted">Not specified</span>'; ?></div>
+                                </div>
+                                <div class="mb-3">
+                                    <div class="detail-label">Engine Number</div>
+                                    <div class="detail-value"><?php echo $item['engine_number'] ? htmlspecialchars($item['engine_number']) : '<span class="text-muted">Not specified</span>'; ?></div>
+                                </div>
+                                <div class="mb-3">
+                                    <div class="detail-label">Year Manufactured</div>
+                                    <div class="detail-value"><?php echo $item['year_manufactured'] ? htmlspecialchars($item['year_manufactured']) : '<span class="text-muted">Not specified</span>'; ?></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <?php endif; ?>
+                    
+                    <!-- Furniture & Fixtures Specific Fields -->
+                    <?php if ($item['category_code'] === 'FF' && ($item['material'] || $item['furniture_dimensions'] || $item['furniture_manufacturer'])): ?>
+                    <div class="detail-section">
+                        <h5 class="mb-3"><i class="bi bi-lamp"></i> Furniture & Fixtures Specifications</h5>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <div class="detail-label">Material</div>
+                                    <div class="detail-value"><?php echo $item['material'] ? htmlspecialchars($item['material']) : '<span class="text-muted">Not specified</span>'; ?></div>
+                                </div>
+                                <div class="mb-3">
+                                    <div class="detail-label">Dimensions</div>
+                                    <div class="detail-value"><?php echo $item['furniture_dimensions'] ? htmlspecialchars($item['furniture_dimensions']) : '<span class="text-muted">Not specified</span>'; ?></div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <div class="detail-label">Color</div>
+                                    <div class="detail-value"><?php echo $item['furniture_color'] ? htmlspecialchars($item['furniture_color']) : '<span class="text-muted">Not specified</span>'; ?></div>
+                                </div>
+                                <div class="mb-3">
+                                    <div class="detail-label">Manufacturer</div>
+                                    <div class="detail-value"><?php echo $item['furniture_manufacturer'] ? htmlspecialchars($item['furniture_manufacturer']) : '<span class="text-muted">Not specified</span>'; ?></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <?php endif; ?>
+                    
+                    <!-- Machinery & Equipment Specific Fields -->
+                    <?php if ($item['category_code'] === 'ME' && ($item['machine_type'] || $item['machinery_manufacturer'] || $item['model_number'])): ?>
+                    <div class="detail-section">
+                        <h5 class="mb-3"><i class="bi bi-gear"></i> Machinery & Equipment Specifications</h5>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <div class="detail-label">Machine Type</div>
+                                    <div class="detail-value"><?php echo $item['machine_type'] ? htmlspecialchars($item['machine_type']) : '<span class="text-muted">Not specified</span>'; ?></div>
+                                </div>
+                                <div class="mb-3">
+                                    <div class="detail-label">Manufacturer</div>
+                                    <div class="detail-value"><?php echo $item['machinery_manufacturer'] ? htmlspecialchars($item['machinery_manufacturer']) : '<span class="text-muted">Not specified</span>'; ?></div>
+                                </div>
+                                <div class="mb-3">
+                                    <div class="detail-label">Model Number</div>
+                                    <div class="detail-value"><?php echo $item['model_number'] ? htmlspecialchars($item['model_number']) : '<span class="text-muted">Not specified</span>'; ?></div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <div class="detail-label">Capacity</div>
+                                    <div class="detail-value"><?php echo $item['machinery_capacity'] ? htmlspecialchars($item['machinery_capacity']) : '<span class="text-muted">Not specified</span>'; ?></div>
+                                </div>
+                                <div class="mb-3">
+                                    <div class="detail-label">Power Requirements</div>
+                                    <div class="detail-value"><?php echo $item['power_requirements'] ? htmlspecialchars($item['power_requirements']) : '<span class="text-muted">Not specified</span>'; ?></div>
+                                </div>
+                                <div class="mb-3">
+                                    <div class="detail-label">Serial Number</div>
+                                    <div class="detail-value"><?php echo $item['machinery_serial_number'] ? htmlspecialchars($item['machinery_serial_number']) : '<span class="text-muted">Not specified</span>'; ?></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <?php endif; ?>
+                    
+                    <!-- Office Equipment Specific Fields -->
+                    <?php if ($item['category_code'] === 'OE' && ($item['office_brand'] || $item['office_model'] || $item['office_serial_number'])): ?>
+                    <div class="detail-section">
+                        <h5 class="mb-3"><i class="bi bi-printer"></i> Office Equipment Specifications</h5>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <div class="detail-label">Brand</div>
+                                    <div class="detail-value"><?php echo $item['office_brand'] ? htmlspecialchars($item['office_brand']) : '<span class="text-muted">Not specified</span>'; ?></div>
+                                </div>
+                                <div class="mb-3">
+                                    <div class="detail-label">Model</div>
+                                    <div class="detail-value"><?php echo $item['office_model'] ? htmlspecialchars($item['office_model']) : '<span class="text-muted">Not specified</span>'; ?></div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <div class="detail-label">Serial Number</div>
+                                    <div class="detail-value"><?php echo $item['office_serial_number'] ? htmlspecialchars($item['office_serial_number']) : '<span class="text-muted">Not specified</span>'; ?></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <?php endif; ?>
+                    
+                    <!-- Software Specific Fields -->
+                    <?php if ($item['category_code'] === 'SW' && ($item['software_name'] || $item['version'])): ?>
+                    <div class="detail-section">
+                        <h5 class="mb-3"><i class="bi bi-window"></i> Software Specifications</h5>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <div class="detail-label">Software Name</div>
+                                    <div class="detail-value"><?php echo $item['software_name'] ? htmlspecialchars($item['software_name']) : '<span class="text-muted">Not specified</span>'; ?></div>
+                                </div>
+                                <div class="mb-3">
+                                    <div class="detail-label">Version</div>
+                                    <div class="detail-value"><?php echo $item['version'] ? htmlspecialchars($item['version']) : '<span class="text-muted">Not specified</span>'; ?></div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <div class="detail-label">License Key</div>
+                                    <div class="detail-value"><?php echo $item['license_key'] ? htmlspecialchars($item['license_key']) : '<span class="text-muted">Not specified</span>'; ?></div>
+                                </div>
+                                <div class="mb-3">
+                                    <div class="detail-label">License Expiry</div>
+                                    <div class="detail-value"><?php echo $item['license_expiry'] ? date('F j, Y', strtotime($item['license_expiry'])) : '<span class="text-muted">Not specified</span>'; ?></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <?php endif; ?>
+                    
+                    <!-- Land Specific Fields -->
+                    <?php if ($item['category_code'] === 'LD' && ($item['lot_area'] || $item['land_address'])): ?>
+                    <div class="detail-section">
+                        <h5 class="mb-3"><i class="bi bi-map"></i> Land Specifications</h5>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <div class="detail-label">Lot Area (sqm)</div>
+                                    <div class="detail-value"><?php echo $item['lot_area'] ? htmlspecialchars($item['lot_area']) : '<span class="text-muted">Not specified</span>'; ?></div>
+                                </div>
+                                <div class="mb-3">
+                                    <div class="detail-label">Address</div>
+                                    <div class="detail-value"><?php echo $item['land_address'] ? htmlspecialchars($item['land_address']) : '<span class="text-muted">Not specified</span>'; ?></div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <div class="detail-label">Tax Declaration Number</div>
+                                    <div class="detail-value"><?php echo $item['tax_declaration_number'] ? htmlspecialchars($item['tax_declaration_number']) : '<span class="text-muted">Not specified</span>'; ?></div>
                                 </div>
                             </div>
                         </div>

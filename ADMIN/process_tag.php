@@ -168,6 +168,144 @@ try {
         $computer_history_stmt->bind_param("isi", $item_id, $computer_details, $_SESSION['user_id']);
         $computer_history_stmt->execute();
     }
+    elseif ($category && $category['category_code'] === 'VH') {
+        // Vehicles specific fields
+        $brand = trim($_POST['brand'] ?? '');
+        $model = trim($_POST['model'] ?? '');
+        $plate_number = trim($_POST['plate_number'] ?? '');
+        $color = trim($_POST['color'] ?? '');
+        $engine_number = trim($_POST['engine_number'] ?? '');
+        $chassis_number = trim($_POST['chassis_number'] ?? '');
+        $year_model = intval($_POST['year_model'] ?? 0);
+        
+        $vehicle_sql = "INSERT INTO asset_vehicles 
+                       (asset_item_id, brand, model, plate_number, color, engine_number, chassis_number, year_manufactured, created_by, created_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                       ON DUPLICATE KEY UPDATE
+                       brand = VALUES(brand),
+                       model = VALUES(model),
+                       plate_number = VALUES(plate_number),
+                       color = VALUES(color),
+                       engine_number = VALUES(engine_number),
+                       chassis_number = VALUES(chassis_number),
+                       year_manufactured = VALUES(year_manufactured),
+                       updated_by = VALUES(created_by),
+                       updated_at = CURRENT_TIMESTAMP";
+        
+        $vehicle_stmt = $conn->prepare($vehicle_sql);
+        $vehicle_stmt->bind_param("isssssiii", $item_id, $brand, $model, $plate_number, $color, $engine_number, $chassis_number, $year_model, $_SESSION['user_id']);
+        $vehicle_stmt->execute();
+    }
+    elseif ($category && $category['category_code'] === 'FF') {
+        // Furniture & Fixtures specific fields
+        $material = trim($_POST['material'] ?? '');
+        $dimensions = trim($_POST['dimensions'] ?? '');
+        $furniture_color = trim($_POST['color'] ?? '');
+        $manufacturer = trim($_POST['manufacturer'] ?? '');
+        
+        $furniture_sql = "INSERT INTO asset_furniture 
+                       (asset_item_id, material, dimensions, color, manufacturer, created_by, created_at)
+                       VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                       ON DUPLICATE KEY UPDATE
+                       material = VALUES(material),
+                       dimensions = VALUES(dimensions),
+                       color = VALUES(color),
+                       manufacturer = VALUES(manufacturer),
+                       updated_by = VALUES(created_by),
+                       updated_at = CURRENT_TIMESTAMP";
+        
+        $furniture_stmt = $conn->prepare($furniture_sql);
+        $furniture_stmt->bind_param("issssi", $item_id, $material, $dimensions, $furniture_color, $manufacturer, $_SESSION['user_id']);
+        $furniture_stmt->execute();
+    }
+    elseif ($category && $category['category_code'] === 'ME') {
+        // Machinery & Equipment specific fields
+        $manufacturer = trim($_POST['manufacturer'] ?? '');
+        $model = trim($_POST['model'] ?? '');
+        $capacity = trim($_POST['capacity'] ?? '');
+        $power_rating = trim($_POST['power_rating'] ?? '');
+        $serial_number = trim($_POST['serial_number'] ?? '');
+        
+        $machinery_sql = "INSERT INTO asset_machinery 
+                       (asset_item_id, machine_type, manufacturer, model_number, capacity, power_requirements, serial_number, created_by, created_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                       ON DUPLICATE KEY UPDATE
+                       machine_type = VALUES(machine_type),
+                       manufacturer = VALUES(manufacturer),
+                       model_number = VALUES(model_number),
+                       capacity = VALUES(capacity),
+                       power_requirements = VALUES(power_requirements),
+                       serial_number = VALUES(serial_number),
+                       updated_by = VALUES(created_by),
+                       updated_at = CURRENT_TIMESTAMP";
+        
+        $machinery_stmt = $conn->prepare($machinery_sql);
+        $machinery_stmt->bind_param("issssssi", $item_id, $manufacturer, $manufacturer, $model, $capacity, $power_rating, $serial_number, $_SESSION['user_id']);
+        $machinery_stmt->execute();
+    }
+    elseif ($category && $category['category_code'] === 'OE') {
+        // Office Equipment specific fields
+        $brand = trim($_POST['brand'] ?? '');
+        $model = trim($_POST['model'] ?? '');
+        $serial_number = trim($_POST['serial_number'] ?? '');
+        
+        $office_equipment_sql = "INSERT INTO asset_office_equipment 
+                       (asset_item_id, brand, model, serial_number, created_by, created_at)
+                       VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                       ON DUPLICATE KEY UPDATE
+                       brand = VALUES(brand),
+                       model = VALUES(model),
+                       serial_number = VALUES(serial_number),
+                       updated_by = VALUES(created_by),
+                       updated_at = CURRENT_TIMESTAMP";
+        
+        $office_equipment_stmt = $conn->prepare($office_equipment_sql);
+        $office_equipment_stmt->bind_param("isssi", $item_id, $brand, $model, $serial_number, $_SESSION['user_id']);
+        $office_equipment_stmt->execute();
+    }
+    elseif ($category && $category['category_code'] === 'SW') {
+        // Software specific fields
+        $software_name = trim($_POST['software_name'] ?? '');
+        $version = trim($_POST['version'] ?? '');
+        $license_key = trim($_POST['license_key'] ?? '');
+        $expiry_date = !empty($_POST['expiry_date']) ? $_POST['expiry_date'] : null;
+        
+        $software_sql = "INSERT INTO asset_software 
+                       (asset_item_id, software_name, version, license_key, license_expiry, created_by, created_at)
+                       VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                       ON DUPLICATE KEY UPDATE
+                       software_name = VALUES(software_name),
+                       version = VALUES(version),
+                       license_key = VALUES(license_key),
+                       license_expiry = VALUES(license_expiry),
+                       updated_by = VALUES(created_by),
+                       updated_at = CURRENT_TIMESTAMP";
+        
+        $software_stmt = $conn->prepare($software_sql);
+        $software_stmt->bind_param("issssi", $item_id, $software_name, $version, $license_key, $expiry_date, $_SESSION['user_id']);
+        $software_stmt->execute();
+    }
+    elseif ($category && $category['category_code'] === 'LD') {
+        // Land specific fields
+        $lot_number = trim($_POST['lot_number'] ?? '');
+        $area_size = trim($_POST['area_size'] ?? '');
+        $location = trim($_POST['location'] ?? '');
+        $tax_declaration = trim($_POST['tax_declaration'] ?? '');
+        
+        $land_sql = "INSERT INTO asset_land 
+                       (asset_item_id, lot_area, address, tax_declaration_number, created_by, created_at)
+                       VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                       ON DUPLICATE KEY UPDATE
+                       lot_area = VALUES(lot_area),
+                       address = VALUES(address),
+                       tax_declaration_number = VALUES(tax_declaration_number),
+                       updated_by = VALUES(created_by),
+                       updated_at = CURRENT_TIMESTAMP";
+        
+        $land_stmt = $conn->prepare($land_sql);
+        $land_stmt->bind_param("isssi", $item_id, $area_size, $location, $tax_declaration, $_SESSION['user_id']);
+        $land_stmt->execute();
+    }
     
     // Get employee information for logging
     $employee_sql = "SELECT employee_no, firstname, lastname FROM employees WHERE id = ?";
