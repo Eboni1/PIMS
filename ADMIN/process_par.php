@@ -133,11 +133,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // Insert multiple asset items based on quantity
                 for ($item_num = 1; $item_num <= $quantity; $item_num++) {
                     $description = $conn->real_escape_string($descriptions[$i]);
+                    $unit = $conn->real_escape_string($units[$i]);
                     $status = 'no_tag';
                     $acquisition_date = !empty($date_acquired) ? "'$date_acquired'" : 'NULL';
                     
-                    $sql = "INSERT INTO asset_items (asset_id, par_id, description, status, value, acquisition_date, office_id, created_at, last_updated) 
-                           VALUES ($asset_id, $par_form_id, '$description', '$status', $unit_cost, $acquisition_date, $office_id, NOW(), NOW())";
+                    $sql = "INSERT INTO asset_items (asset_id, par_id, description, unit, status, value, acquisition_date, office_id, created_at, last_updated) 
+                           VALUES ($asset_id, $par_form_id, '$description', '$unit', '$status', $unit_cost, $acquisition_date, $office_id, NOW(), NOW())";
                     
                     if (!$conn->query($sql)) {
                         throw new Exception('Failed to save asset item ' . $item_num . ': ' . $conn->error);
