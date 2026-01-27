@@ -171,27 +171,33 @@ function getTagSpecificData($conn, $tag_id, $category_code) {
         
         .print-container {
             width: 100%;
-            max-width: 8in;
+            max-width: 8.5in;
             margin: 0 auto;
-            padding: 20px;
+            padding: 10px;
             position: relative;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 1fr 1fr 1fr;
+            gap: 15px;
             min-height: 100vh;
         }
         
         .tag-container {
             width: 100%;
+            height: 3.5in;
             border: 2px solid #000;
-            padding: 20px;
+            padding: 12px;
             background: white;
             page-break-inside: avoid;
-            margin-bottom: 30px;
+            display: flex;
+            flex-direction: column;
         }
         
         .tag-header {
             text-align: center;
             border-bottom: 2px solid #000;
-            padding-bottom: 15px;
-            margin-bottom: 20px;
+            padding-bottom: 8px;
+            margin-bottom: 10px;
         }
         
         .header-row {
@@ -202,21 +208,21 @@ function getTagSpecificData($conn, $tag_id, $category_code) {
         }
         
         .seal {
-            width: 60px;
-            height: 60px;
+            width: 40px;
+            height: 40px;
             border: 2px solid #000;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 8px;
+            font-size: 6px;
             text-align: center;
             font-weight: bold;
         }
         
         .seal-logo {
-            max-width: 50px;
-            max-height: 50px;
+            max-width: 36px;
+            max-height: 36px;
             border-radius: 50%;
             object-fit: contain;
         }
@@ -224,26 +230,26 @@ function getTagSpecificData($conn, $tag_id, $category_code) {
         .header-text {
             flex: 1;
             text-align: center;
-            margin: 0 20px;
+            margin: 0 10px;
         }
         
         .header-logo {
-            max-width: 56px;
-            max-height: 56px;
+            max-width: 36px;
+            max-height: 36px;
             border-radius: 50%;
             object-fit: contain;
         }
         
         .header-text h2 {
             margin: 0;
-            font-size: 16px;
+            font-size: 12px;
             font-weight: bold;
             text-transform: uppercase;
         }
         
         .header-text h3 {
-            margin: 5px 0 0 0;
-            font-size: 14px;
+            margin: 2px 0 0 0;
+            font-size: 10px;
             font-weight: bold;
             text-transform: uppercase;
         }
@@ -275,44 +281,50 @@ function getTagSpecificData($conn, $tag_id, $category_code) {
         }
         
         .tag-body {
-            margin-bottom: 20px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            font-size: 8px;
         }
         
         .field-row {
             display: flex;
-            margin-bottom: 10px;
+            margin-bottom: 5px;
             align-items: flex-start;
         }
         
         .field-label {
-            width: 180px;
+            width: 120px;
             font-weight: bold;
             flex-shrink: 0;
+            font-size: 7px;
         }
         
         .field-value {
             flex: 1;
             border-bottom: 1px solid #000;
-            min-height: 20px;
-            padding: 2px 0;
+            min-height: 12px;
+            padding: 1px 2px;
+            font-size: 7px;
         }
         
         .checkbox-row {
             display: flex;
-            gap: 30px;
-            margin-bottom: 10px;
+            gap: 15px;
+            margin-bottom: 5px;
         }
         
         .checkbox-item {
             display: flex;
             align-items: center;
-            gap: 5px;
+            gap: 3px;
         }
         
         .checkbox {
-            font-size: 16px;
-            width: 20px;
-            height: 20px;
+            font-size: 10px;
+            width: 12px;
+            height: 12px;
             border: 1px solid #000;
             display: flex;
             align-items: center;
@@ -321,7 +333,7 @@ function getTagSpecificData($conn, $tag_id, $category_code) {
         
         .two-column {
             display: flex;
-            gap: 20px;
+            gap: 10px;
         }
         
         .two-column .field-row {
@@ -329,15 +341,15 @@ function getTagSpecificData($conn, $tag_id, $category_code) {
         }
         
         .signature-section {
-            margin-top: 30px;
+            margin-top: auto;
             border-top: 1px solid #000;
-            padding-top: 20px;
+            padding-top: 5px;
         }
         
         .signature-row {
             display: flex;
             justify-content: space-between;
-            margin-bottom: 20px;
+            margin-bottom: 5px;
         }
         
         .signature-box {
@@ -347,12 +359,12 @@ function getTagSpecificData($conn, $tag_id, $category_code) {
         
         .signature-line {
             border-bottom: 1px solid #000;
-            height: 30px;
-            margin-bottom: 5px;
+            height: 15px;
+            margin-bottom: 3px;
         }
         
         .signature-label {
-            font-size: 10px;
+            font-size: 6px;
             font-style: italic;
         }
         
@@ -360,15 +372,19 @@ function getTagSpecificData($conn, $tag_id, $category_code) {
             body {
                 margin: 0;
                 padding: 0;
+                font-size: 10px;
             }
             
             .print-container {
-                padding: 0;
+                padding: 5px;
+                max-width: 8.5in;
+                width: 8.5in;
             }
             
             @page {
                 size: Letter;
-                margin: 0.5in;
+                margin: 0.25in;
+                orientation: portrait;
             }
             
             html {
@@ -377,6 +393,11 @@ function getTagSpecificData($conn, $tag_id, $category_code) {
             
             header, nav, .no-print {
                 display: none !important;
+            }
+            
+            .tag-container {
+                page-break-inside: avoid;
+                break-inside: avoid;
             }
         }
     </style>
