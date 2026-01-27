@@ -32,6 +32,9 @@ $where_conditions = [];
 $params = [];
 $types = '';
 
+// Always filter for serviceable items only
+$where_conditions[] = "ai.status = 'serviceable'";
+
 if (!empty($search)) {
     $where_conditions[] = "(ai.inventory_tag LIKE ? OR ai.property_no LIKE ? OR a.description LIKE ? OR e.lastname LIKE ? OR e.firstname LIKE ?)";
     $search_param = "%$search%";
@@ -51,7 +54,7 @@ if (!empty($status_filter)) {
     $types .= 's';
 }
 
-$where_clause = !empty($where_conditions) ? 'WHERE ' . implode(' AND ', $where_conditions) : '';
+$where_clause = 'WHERE ' . implode(' AND ', $where_conditions);
 
 // Get inventory tags
 $tags = [];
@@ -109,7 +112,7 @@ try {
                 COUNT(DISTINCT CASE WHEN ai.status = 'unserviceable' THEN ai.id END) as unserviceable,
                 COUNT(DISTINCT ai.office_id) as offices_with_tags
               FROM asset_items ai 
-              WHERE ai.inventory_tag IS NOT NULL AND ai.inventory_tag != ''";
+              WHERE ai.inventory_tag IS NOT NULL AND ai.inventory_tag != '' AND ai.status = 'serviceable'";
     $result = $conn->query($sql);
     if ($result) {
         $stats = $result->fetch_assoc();
@@ -338,28 +341,22 @@ try {
         
         <!-- Statistics Cards -->
         <div class="row mb-4 no-print">
-            <div class="col-lg-3 col-md-6">
+            <div class="col-lg-4 col-md-6">
                 <div class="stats-card">
                     <div class="stats-number"><?php echo number_format($stats['total_tags'] ?? 0); ?></div>
-                    <div class="stats-label"><i class="bi bi-tags"></i> Total Tags</div>
+                    <div class="stats-label"><i class="bi bi-tags"></i> Serviceable Tags</div>
                 </div>
             </div>
-            <div class="col-lg-3 col-md-6">
-                <div class="stats-card">
-                    <div class="stats-number"><?php echo number_format($stats['serviceable'] ?? 0); ?></div>
-                    <div class="stats-label"><i class="bi bi-check-circle"></i> Serviceable</div>
-                </div>
-            </div>
-            <div class="col-lg-3 col-md-6">
-                <div class="stats-card">
-                    <div class="stats-number"><?php echo number_format($stats['unserviceable'] ?? 0); ?></div>
-                    <div class="stats-label"><i class="bi bi-x-circle"></i> Unserviceable</div>
-                </div>
-            </div>
-            <div class="col-lg-3 col-md-6">
+            <div class="col-lg-4 col-md-6">
                 <div class="stats-card">
                     <div class="stats-number"><?php echo number_format($stats['offices_with_tags'] ?? 0); ?></div>
                     <div class="stats-label"><i class="bi bi-building"></i> Offices with Tags</div>
+                </div>
+            </div>
+            <div class="col-lg-4 col-md-6">
+                <div class="stats-card">
+                    <div class="stats-number"><?php echo isset($stats['total_tags']) && $stats['total_tags'] > 0 ? number_format($stats['total_tags'] / $stats['offices_with_tags'], 1) : '0'; ?></div>
+                    <div class="stats-label"><i class="bi bi-graph-up"></i> Avg Tags per Office</div>
                 </div>
             </div>
         </div>
@@ -385,11 +382,8 @@ try {
                 </div>
                 <div class="col-md-3">
                     <select name="status" class="form-select">
-                        <option value="">All Status</option>
+                        <option value="">All Serviceable Items</option>
                         <option value="serviceable" <?php echo $status_filter == 'serviceable' ? 'selected' : ''; ?>>Serviceable</option>
-                        <option value="unserviceable" <?php echo $status_filter == 'unserviceable' ? 'selected' : ''; ?>>Unserviceable</option>
-                        <option value="in_use" <?php echo $status_filter == 'in_use' ? 'selected' : ''; ?>>In Use</option>
-                        <option value="available" <?php echo $status_filter == 'available' ? 'selected' : ''; ?>>Available</option>
                     </select>
                 </div>
                 <div class="col-md-2">
