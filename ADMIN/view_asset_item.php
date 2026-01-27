@@ -411,6 +411,18 @@ $status_display = formatStatus($item['status']);
                                     </div>
                                 </div>
                             </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <div class="detail-label">End User</div>
+                                    <div class="detail-value">
+                                        <?php if (!empty($item['end_user'])): ?>
+                                            <?php echo htmlspecialchars($item['end_user']); ?>
+                                        <?php else: ?>
+                                            <span class="text-muted">Not specified</span>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     

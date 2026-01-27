@@ -112,7 +112,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 
                 // Create individual asset items for each quantity
                 for ($item_num = 1; $item_num <= $quantity; $item_num++) {
-                    $asset_item_stmt->bind_param("iisdsi", $asset_id, $ics_form_id, $descriptions[$i], $units[$i], $unit_cost, $office_id);
+                    // Debug: Log the values being inserted
+                    logSystemAction($_SESSION['user_id'], 'ICS Asset Item Insert Debug', 'assets', "Item: {$descriptions[$i]}, Unit: '{$units[$i]}', Unit Cost: {$unit_cost}, Office ID: {$office_id}");
+                    
+                    $asset_item_stmt->bind_param("iissdi", $asset_id, $ics_form_id, $descriptions[$i], $units[$i], $unit_cost, $office_id);
                     
                     if (!$asset_item_stmt->execute()) {
                         throw new Exception('Failed to save asset item ' . $item_num . ': ' . $asset_item_stmt->error);

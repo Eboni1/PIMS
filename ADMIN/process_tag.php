@@ -3,6 +3,7 @@ session_start();
 require_once '../config.php';
 require_once '../includes/qr_generator.php';
 require_once '../includes/system_functions.php';
+require_once '../includes/logger.php';
 
 // Check if user is logged in and has appropriate role
 if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['system_admin', 'admin'])) {
@@ -27,6 +28,9 @@ $end_user = trim($_POST['end_user']);
 $date_counted = trim($_POST['date_counted']);
 $tag_format_id = intval($_POST['tag_format_id']);
 $current_number = intval($_POST['current_number']);
+
+// Debug: Log the form data we received
+logSystemAction($_SESSION['user_id'], 'Tag Form Data Received', 'forms', "Item ID: {$item_id}, End User: '{$end_user}', Person Accountable: {$person_accountable}");
 
 // Check if we should increment the property number counter
 if (isset($_POST['increment_property_counter']) && $_POST['increment_property_counter'] == '1') {
@@ -96,12 +100,29 @@ try {
                    image = ?,
                    employee_id = ?, 
                    category_id = ?,
+                   end_user = ?,
                    status = 'serviceable',
                    last_updated = CURRENT_TIMESTAMP
                    WHERE id = ?";
+    
+    // Debug: Log the SQL and values before execution
+    logSystemAction($_SESSION['user_id'], 'Tag Update SQL Debug', 'forms', "SQL: {$update_sql}");
+    logSystemAction($_SESSION['user_id'], 'Tag Update Values Debug', 'forms', "Values: property_no='{$property_no}', inventory_tag='{$inventory_tag}', date_counted='{$date_counted}', image='{$image_filename}', employee_id={$person_accountable}, category_id={$category_id}, end_user='{$end_user}', item_id={$item_id}");
+    
     $update_stmt = $conn->prepare($update_sql);
-    $update_stmt->bind_param("ssssiii", $property_no, $inventory_tag, $date_counted, $image_filename, $person_accountable, $category_id, $item_id);
-    $update_stmt->execute();
+    $update_stmt->bind_param("ssssiiis", $property_no, $inventory_tag, $date_counted, $image_filename, $person_accountable, $category_id, $end_user, $item_id);
+    
+    if (!$update_stmt->execute()) {
+        throw new Exception('Failed to update asset item: ' . $update_stmt->error);
+    }
+    
+    // Log the update for debugging
+    $affected_rows = $update_stmt->affected_rows;
+    if ($affected_rows > 0) {
+        logSystemAction($_SESSION['user_id'], 'Asset item updated successfully', 'assets', "Item ID: {$item_id}, End User: {$end_user}, Rows affected: {$affected_rows}");
+    } else {
+        logSystemAction($_SESSION['user_id'], 'Asset item update - no rows affected', 'assets', "Item ID: {$item_id}, End User: {$end_user}");
+    }
     
     // Generate QR code for the asset item
     $qrGenerator = new QRCodeGenerator();
