@@ -24,13 +24,19 @@ $category_id = intval($_POST['category_id']);
 $property_no = trim($_POST['property_no']);
 $inventory_tag = trim($_POST['inventory_tag']);
 $person_accountable = intval($_POST['person_accountable']);
-$end_user = trim($_POST['end_user']);
+$end_user = trim($_POST['end_user'] ?? '');
 $date_counted = trim($_POST['date_counted']);
 $tag_format_id = intval($_POST['tag_format_id']);
 $current_number = intval($_POST['current_number']);
 
 // Debug: Log the form data we received
 logSystemAction($_SESSION['user_id'], 'Tag Form Data Received', 'forms', "Item ID: {$item_id}, End User: '{$end_user}', Person Accountable: {$person_accountable}");
+
+// Immediate check: If end_user is empty, log all POST data for debugging
+if (empty($end_user)) {
+    logSystemAction($_SESSION['user_id'], 'Tag Form - Empty End User', 'forms', "POST data: " . json_encode($_POST));
+    error_log("Empty end_user in process_tag.php. POST data: " . print_r($_POST, true));
+}
 
 // Check if we should increment the property number counter
 if (isset($_POST['increment_property_counter']) && $_POST['increment_property_counter'] == '1') {
@@ -92,35 +98,42 @@ try {
     // Start transaction
     $conn->begin_transaction();
     
-    // Update asset item with tag information
+    // Update asset item with tag information using traditional SQL
+    $property_no_safe = mysqli_real_escape_string($conn, $property_no);
+    $inventory_tag_safe = mysqli_real_escape_string($conn, $inventory_tag);
+    $date_counted_safe = mysqli_real_escape_string($conn, $date_counted);
+    $image_filename_safe = mysqli_real_escape_string($conn, $image_filename);
+    $end_user_safe = mysqli_real_escape_string($conn, $end_user);
+    
     $update_sql = "UPDATE asset_items SET 
-                   property_no = ?, 
-                   inventory_tag = ?, 
-                   date_counted = ?,
-                   image = ?,
-                   employee_id = ?, 
-                   category_id = ?,
-                   end_user = ?,
+                   property_no = '$property_no_safe', 
+                   inventory_tag = '$inventory_tag_safe', 
+                   date_counted = '$date_counted_safe',
+                   image = '$image_filename_safe',
+                   employee_id = $person_accountable, 
+                   category_id = $category_id,
+                   end_user = '$end_user_safe',
                    status = 'serviceable',
                    last_updated = CURRENT_TIMESTAMP
-                   WHERE id = ?";
+                   WHERE id = $item_id";
     
     // Debug: Log the SQL and values before execution
-    logSystemAction($_SESSION['user_id'], 'Tag Update SQL Debug', 'forms', "SQL: {$update_sql}");
-    logSystemAction($_SESSION['user_id'], 'Tag Update Values Debug', 'forms', "Values: property_no='{$property_no}', inventory_tag='{$inventory_tag}', date_counted='{$date_counted}', image='{$image_filename}', employee_id={$person_accountable}, category_id={$category_id}, end_user='{$end_user}', item_id={$item_id}");
+    logSystemAction($_SESSION['user_id'], 'Tag Update SQL Debug', 'forms', "SQL: $update_sql");
+    logSystemAction($_SESSION['user_id'], 'Tag Update Values Debug', 'forms', "Values: property_no='{$property_no}', inventory_tag='{$inventory_tag}', date_counted='{$date_counted}', image='{$image_filename}', employee_id={$person_accountable}, category_id={$category_id}, end_user='{$end_user}' (length: " . strlen($end_user) . "), item_id={$item_id}");
     
-    $update_stmt = $conn->prepare($update_sql);
-    $update_stmt->bind_param("ssssiiis", $property_no, $inventory_tag, $date_counted, $image_filename, $person_accountable, $category_id, $end_user, $item_id);
+    // Execute the traditional SQL
+    $update_result = mysqli_query($conn, $update_sql);
     
-    if (!$update_stmt->execute()) {
-        throw new Exception('Failed to update asset item: ' . $update_stmt->error);
+    if (!$update_result) {
+        throw new Exception('Failed to update asset item: ' . mysqli_error($conn));
     }
     
     // Log the update for debugging
-    $affected_rows = $update_stmt->affected_rows;
+    $affected_rows = mysqli_affected_rows($conn);
     if ($affected_rows > 0) {
         logSystemAction($_SESSION['user_id'], 'Asset item updated successfully', 'assets', "Item ID: {$item_id}, End User: {$end_user}, Rows affected: {$affected_rows}");
     } else {
+        // Log if no items were updated for debugging
         logSystemAction($_SESSION['user_id'], 'Asset item update - no rows affected', 'assets', "Item ID: {$item_id}, End User: {$end_user}");
     }
     
