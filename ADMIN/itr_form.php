@@ -40,6 +40,14 @@ $result = $conn->query("SELECT header_image FROM forms WHERE form_code = 'ITR'")
 if ($result && $row = $result->fetch_assoc()) {
     $header_image = $row['header_image'];
 }
+
+// Get active employees for dropdown
+$employees = [];
+$employees_sql = "SELECT id, employee_no, firstname, lastname FROM employees WHERE employment_status IN ('permanent', 'contractual', 'job_order') ORDER BY lastname, firstname";
+$employees_result = $conn->query($employees_sql);
+while ($employee_row = $employees_result->fetch_assoc()) {
+    $employees[] = $employee_row;
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -52,6 +60,9 @@ if ($result && $row = $result->fetch_assoc()) {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Bootstrap Icons -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.3/font/bootstrap-icons.css">
+    <!-- Select2 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <!-- Custom CSS -->
@@ -180,6 +191,48 @@ if ($result && $row = $result->fetch_assoc()) {
         .autocomplete-item.active strong {
             color: white;
         }
+
+        /* Employee Search Results Styles */
+        .position-relative {
+            position: relative !important;
+        }
+
+        #from_employee_results, #to_employee_results {
+            position: absolute !important;
+            top: 100% !important;
+            left: 0 !important;
+            right: 0 !important;
+            background: white !important;
+            border: 2px solid #191BA9 !important;
+            border-top: none !important;
+            border-radius: 0 0 0.5rem 0.5rem !important;
+            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+            max-height: 200px !important;
+            overflow-y: auto !important;
+            z-index: 99999 !important;
+            display: none !important;
+            min-width: 100% !important;
+        }
+
+        .employee-result-item {
+            padding: 10px 15px !important;
+            cursor: pointer !important;
+            border-bottom: 1px solid #f8f9fa !important;
+            transition: all 0.3s ease-in-out !important;
+            background: white !important;
+        }
+
+        .employee-result-item:hover {
+            background-color: #f8f9fa !important;
+        }
+
+        .employee-result-item:last-child {
+            border-bottom: none !important;
+        }
+
+        .employee-result-item strong {
+            color: #191BA9 !important;
+        }
     </style>
 </head>
 
@@ -256,7 +309,14 @@ if ($result && $row = $result->fetch_assoc()) {
                     <div class="row mb-3">
                         <div class="col-md-8">
                             <label class="form-label"><strong>From Accountable Officer/Agency/Fund Cluster:</strong></label>
-                            <input type="text" class="form-control" name="from_office" required>
+                            <select class="form-select" id="from_employee_search" name="from_office" required>
+                                <option value="">Select Employee</option>
+                                <?php foreach ($employees as $employee): ?>
+                                    <option value="<?php echo $employee['id']; ?>">
+                                        <?php echo htmlspecialchars($employee['employee_no'] . ' - ' . $employee['lastname'] . ', ' . $employee['firstname']); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
                         </div>
                         <div class="col-md-4">
                             <label class="form-label"><strong>ITR No:</strong></label>
@@ -268,7 +328,14 @@ if ($result && $row = $result->fetch_assoc()) {
                     <div class="row mb-3">
                         <div class="col-md-8">
                             <label class="form-label"><strong>To Accountable Officer/Agency/Fund Cluster:</strong></label>
-                            <input type="text" class="form-control" name="to_office" required>
+                            <select class="form-select" id="to_employee_search" name="to_office" required>
+                                <option value="">Select Employee</option>
+                                <?php foreach ($employees as $employee): ?>
+                                    <option value="<?php echo $employee['id']; ?>">
+                                        <?php echo htmlspecialchars($employee['employee_no'] . ' - ' . $employee['lastname'] . ', ' . $employee['firstname']); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
                         </div>
                         <div class="col-md-4">
                             <label class="form-label"><strong>Date:</strong></label>
@@ -427,6 +494,10 @@ if ($result && $row = $result->fetch_assoc()) {
     <?php include 'includes/change-password-modal.php'; ?>
     <?php include 'includes/sidebar-scripts.php'; ?>
 
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+    <!-- Select2 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         function addITRRow() {
@@ -581,6 +652,21 @@ if ($result && $row = $result->fetch_assoc()) {
 
             // Initialize autocomplete for description fields
             initializeAutocomplete();
+            
+            // Initialize Select2 for employee dropdowns
+            $('#from_employee_search').select2({
+                theme: 'bootstrap-5',
+                placeholder: 'Search and select employee...',
+                allowClear: true,
+                width: '100%'
+            });
+            
+            $('#to_employee_search').select2({
+                theme: 'bootstrap-5',
+                placeholder: 'Search and select employee...',
+                allowClear: true,
+                width: '100%'
+            });
         });
 
         // Autocomplete functionality for ITR asset search
@@ -764,6 +850,136 @@ if ($result && $row = $result->fetch_assoc()) {
             const regex = new RegExp(`(${query})`, 'gi');
             return text.replace(regex, '<strong>$1</strong>');
         }
+
+        // Employee Search Functionality
+        function initializeEmployeeSearch() {
+            setupEmployeeSearch('from_employee_search', 'from_employee_results', 'from_employee_id');
+            setupEmployeeSearch('to_employee_search', 'to_employee_results', 'to_employee_id');
+        }
+
+        function setupEmployeeSearch(inputId, resultsId, hiddenId) {
+            const searchInput = document.getElementById(inputId);
+            const resultsDiv = document.getElementById(resultsId);
+            const hiddenInput = document.getElementById(hiddenId);
+            let timeout;
+
+            searchInput.addEventListener('input', function() {
+                const query = this.value.trim();
+                clearTimeout(timeout);
+
+                if (query.length < 2) {
+                    resultsDiv.style.display = 'none';
+                    return;
+                }
+
+                timeout = setTimeout(() => {
+                    searchEmployees(query, resultsDiv, searchInput, hiddenInput);
+                }, 300);
+            });
+
+            searchInput.addEventListener('focus', function() {
+                if (this.value.trim().length >= 2) {
+                    const query = this.value.trim();
+                    searchEmployees(query, resultsDiv, searchInput, hiddenInput);
+                }
+            });
+
+            // Hide results when clicking outside
+            document.addEventListener('click', function(e) {
+                if (!searchInput.contains(e.target) && !resultsDiv.contains(e.target)) {
+                    resultsDiv.style.display = 'none';
+                }
+            });
+        }
+
+        function searchEmployees(query, resultsDiv, searchInput, hiddenInput) {
+            console.log('Searching employees with query:', query);
+            console.log('Results div:', resultsDiv);
+            console.log('Search input:', searchInput);
+            console.log('Hidden input:', hiddenInput);
+            
+            const url = `../includes/search_employees.php?q=${encodeURIComponent(query)}`;
+            console.log('Fetch URL:', url);
+            
+            fetch(url)
+                .then(response => {
+                    console.log('Response status:', response.status);
+                    console.log('Response headers:', response.headers);
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('Search results data:', data);
+                    console.log('Data type:', typeof data);
+                    console.log('Data length:', data.length);
+                    
+                    displayEmployeeResults(data, resultsDiv, searchInput, hiddenInput, query);
+                })
+                .catch(error => {
+                    console.error('Error searching employees:', error);
+                    console.error('Error details:', error.message);
+                    resultsDiv.style.display = 'none';
+                });
+        }
+
+        function displayEmployeeResults(employees, resultsDiv, searchInput, hiddenInput, query) {
+            console.log('Displaying employee results:', employees);
+            console.log('Results div element:', resultsDiv);
+            console.log('Search input element:', searchInput);
+            console.log('Hidden input element:', hiddenInput);
+            console.log('Query:', query);
+            console.log('Employees length:', employees ? employees.length : 'null/undefined');
+            
+            if (!employees || employees.length === 0) {
+                console.log('No employees found, showing message');
+                resultsDiv.innerHTML = '<div class="p-2 text-muted">No employees found</div>';
+                resultsDiv.style.display = 'block';
+                console.log('Set display to block, innerHTML:', resultsDiv.innerHTML);
+                return;
+            }
+
+            let html = '';
+            employees.forEach((employee, index) => {
+                console.log(`Processing employee ${index}:`, employee);
+                const displayName = `${employee.firstname} ${employee.lastname}`;
+                const displayText = `${employee.employee_no} - ${displayName}`;
+                if (employee.position) {
+                    displayText += ` - ${employee.position}`;
+                }
+                if (employee.office_name) {
+                    displayText += ` (${employee.office_name})`;
+                }
+
+                html += `
+                    <div class="employee-result-item p-2 border-bottom" 
+                         onclick="selectEmployee('${employee.id}', '${displayName.replace(/'/g, "\\'")}', '${searchInput.id}', '${hiddenInput.id}')"
+                         style="cursor: pointer;">
+                        <div class="fw-bold">${highlightMatch(displayText, query)}</div>
+                        <small class="text-muted">${employee.employee_no}</small>
+                    </div>
+                `;
+            });
+
+            console.log('Generated HTML:', html);
+            resultsDiv.innerHTML = html;
+            resultsDiv.style.display = 'block';
+            console.log('Final innerHTML:', resultsDiv.innerHTML);
+            console.log('Final display style:', resultsDiv.style.display);
+        }
+
+        function selectEmployee(employeeId, employeeName, searchInputId, hiddenInputId) {
+            const searchInput = document.getElementById(searchInputId);
+            const hiddenInput = document.getElementById(hiddenInputId);
+            const resultsDiv = document.getElementById(searchInputId.replace('_search', '_results'));
+
+            searchInput.value = employeeName;
+            hiddenInput.value = employeeId;
+            resultsDiv.style.display = 'none';
+        }
+
+        // Initialize employee search when DOM is loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeEmployeeSearch();
+        });
     </script>
 </body>
 
