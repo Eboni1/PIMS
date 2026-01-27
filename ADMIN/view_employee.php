@@ -64,6 +64,26 @@ try {
 // Log view employee action
 logSystemAction($_SESSION['user_id'], 'view', 'employees', "Viewed employee: {$employee['firstname']} {$employee['lastname']}");
 
+// Get assets assigned to employee
+$employee_assets = [];
+try {
+    $stmt = $conn->prepare("SELECT ai.*, a.description as asset_description, ac.category_name, ac.category_code,
+                                   o.office_name
+                            FROM asset_items ai 
+                            LEFT JOIN assets a ON ai.asset_id = a.id 
+                            LEFT JOIN asset_categories ac ON COALESCE(ai.category_id, a.asset_categories_id) = ac.id 
+                            LEFT JOIN offices o ON ai.office_id = o.id 
+                            WHERE ai.employee_id = ? 
+                            ORDER BY ai.created_at DESC");
+    $stmt->bind_param("i", $employee_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $employee_assets = $result->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+} catch (Exception $e) {
+    error_log("Error fetching employee assets: " . $e->getMessage());
+}
+
 // Get status badge classes
 function getStatusBadgeClass($status, $type = 'employment') {
     if ($type === 'employment') {
@@ -337,6 +357,150 @@ function getStatusBadgeClass($status, $type = 'employment') {
                             <?php echo date('F d, Y', strtotime($employee['created_at'])); ?>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Employee Assets -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="view-card">
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h5 class="mb-0"><i class="bi bi-box-seam"></i> Assigned Assets</h5>
+                        <span class="badge bg-primary"><?php echo count($employee_assets); ?> Assets</span>
+                    </div>
+                    
+                    <?php if (!empty($employee_assets)): ?>
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Property No.</th>
+                                        <th>Inventory Tag</th>
+                                        <th>Description</th>
+                                        <th>Category</th>
+                                        <th>Office</th>
+                                        <th>Status</th>
+                                        <th>Value</th>
+                                        <th>Date Acquired</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($employee_assets as $asset): ?>
+                                        <tr>
+                                            <td><?php echo htmlspecialchars($asset['property_no'] ?? 'N/A'); ?></td>
+                                            <td>
+                                                <?php if (!empty($asset['inventory_tag'])): ?>
+                                                    <strong><?php echo htmlspecialchars($asset['inventory_tag']); ?></strong>
+                                                <?php else: ?>
+                                                    <span class="text-muted">No tag</span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td>
+                                                <?php echo htmlspecialchars($asset['description']); ?>
+                                                <?php if (!empty($asset['asset_description'])): ?>
+                                                    <br><small class="text-muted"><?php echo htmlspecialchars($asset['asset_description']); ?></small>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-secondary">
+                                                    <?php echo htmlspecialchars($asset['category_code'] ?? 'N/A'); ?>
+                                                </span>
+                                                <br><small class="text-muted"><?php echo htmlspecialchars($asset['category_name'] ?? ''); ?></small>
+                                            </td>
+                                            <td><?php echo htmlspecialchars($asset['office_name'] ?? 'N/A'); ?></td>
+                                            <td>
+                                                <?php
+                                                $status_class = '';
+                                                switch ($asset['status']) {
+                                                    case 'serviceable':
+                                                        $status_class = 'bg-success';
+                                                        break;
+                                                    case 'unserviceable':
+                                                        $status_class = 'bg-danger';
+                                                        break;
+                                                    case 'in_use':
+                                                        $status_class = 'bg-primary';
+                                                        break;
+                                                    case 'available':
+                                                        $status_class = 'bg-secondary';
+                                                        break;
+                                                    default:
+                                                        $status_class = 'bg-warning';
+                                                }
+                                                ?>
+                                                <span class="badge <?php echo $status_class; ?>">
+                                                    <?php echo ucfirst(htmlspecialchars($asset['status'])); ?>
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <?php 
+                                                // Debug: Show available columns and value
+                                                if (isset($asset['unit_cost'])) {
+                                                    echo number_format($asset['unit_cost'], 2);
+                                                } elseif (isset($asset['value'])) {
+                                                    echo number_format($asset['value'], 2);
+                                                } else {
+                                                    echo '0.00';
+                                                    // Uncomment for debugging: echo '<pre>' . print_r($asset, true) . '</pre>';
+                                                }
+                                                ?>
+                                            </td>
+                                            <td><?php echo $asset['acquisition_date'] ? date('M d, Y', strtotime($asset['acquisition_date'])) : 'N/A'; ?></td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <div class="mt-3">
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="text-center p-3 bg-light rounded">
+                                        <h6 class="text-muted mb-1">Total Assets</h6>
+                                        <h4 class="mb-0"><?php echo count($employee_assets); ?></h4>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="text-center p-3 bg-light rounded">
+                                        <h6 class="text-muted mb-1">Total Value</h6>
+                                        <h4 class="mb-0">
+                                            <?php 
+                                            $total_value = 0;
+                                            foreach ($employee_assets as $asset) {
+                                                if (isset($asset['unit_cost'])) {
+                                                    $total_value += $asset['unit_cost'];
+                                                } elseif (isset($asset['value'])) {
+                                                    $total_value += $asset['value'];
+                                                }
+                                            }
+                                            echo number_format($total_value, 2);
+                                            ?>
+                                        </h4>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="text-center p-3 bg-light rounded">
+                                        <h6 class="text-muted mb-1">Serviceable</h6>
+                                        <h4 class="mb-0">
+                                            <?php 
+                                            $serviceable_count = count(array_filter($employee_assets, function($asset) {
+                                                return $asset['status'] === 'serviceable';
+                                            }));
+                                            echo $serviceable_count;
+                                            ?>
+                                        </h4>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    <?php else: ?>
+                        <div class="text-center py-5">
+                            <i class="bi bi-box-seam fs-1 text-muted mb-3"></i>
+                            <h6 class="text-muted">No assets assigned to this employee</h6>
+                            <p class="text-muted">This employee currently has no assets assigned to them.</p>
+                        </div>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
