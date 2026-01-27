@@ -287,9 +287,7 @@ try {
                 <table class="table table-hover" id="untaggedTable">
                     <thead>
                         <tr>
-                            <th>Category</th>
                             <th>Asset Description</th>
-                            <th>Item Description</th>
                             <th>Status</th>
                             <th>Value</th>
                             <th>Office</th>
@@ -301,15 +299,7 @@ try {
                         <?php if (!empty($asset_items)): ?>
                             <?php foreach ($asset_items as $item): ?>
                                 <tr>
-                                    <td>
-                                        <span class="warning-badge">
-                                            <?php echo htmlspecialchars($item['category_code'] ?? 'N/A'); ?>
-                                        </span>
-                                        <br>
-                                        <small class="text-muted"><?php echo htmlspecialchars($item['category_name'] ?? 'N/A'); ?></small>
-                                    </td>
                                     <td><?php echo htmlspecialchars($item['asset_description']); ?></td>
-                                    <td><?php echo htmlspecialchars($item['description']); ?></td>
                                     <td>
                                         <?php
                                         $status_class = '';
@@ -348,15 +338,15 @@ try {
                                     <td><?php echo htmlspecialchars($item['office_name'] ?? 'N/A'); ?></td>
                                     <td><small><?php echo date('M j, Y', strtotime($item['last_updated'])); ?></small></td>
                                     <td>
-                                        <button class="btn btn-sm btn-outline-primary" onclick="tagItem(<?php echo $item['id']; ?>)">
-                                            <i class="bi bi-tag"></i> Tag
-                                        </button>
+                                        <a href="create_tag.php?id=<?php echo $item['id']; ?>" class="btn btn-outline-warning btn-action" title="Create Tag">
+                                            <i class="bi bi-tag"></i>
+                                        </a>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
                         <?php else: ?>
                             <tr>
-                                <td colspan="8" class="text-center text-muted py-4">
+                                <td colspan="6" class="text-center text-muted py-4">
                                     <i class="bi bi-check-circle fs-1"></i>
                                     <p class="mt-2">No asset items requiring inventory tags found.</p>
                                 </td>
@@ -426,14 +416,6 @@ try {
             a.download = `untagged_asset_items_${new Date().toISOString().split('T')[0]}.csv`;
             a.click();
             window.URL.revokeObjectURL(url);
-        }
-        
-        // Tag item function
-        function tagItem(itemId) {
-            if (confirm('Are you sure you want to mark this item as tagged?')) {
-                // You can implement AJAX call here to update the item status
-                alert('Tag functionality will be implemented. Item ID: ' + itemId);
-            }
         }
     </script>
 </body>

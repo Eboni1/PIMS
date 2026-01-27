@@ -235,12 +235,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['action']) && $_GET['acti
 // Handle filter parameters
 $category_filter = isset($_GET['category']) ? intval($_GET['category']) : 0;
 $office_filter = isset($_GET['office']) ? intval($_GET['office']) : 0;
+$status_filter = isset($_GET['status']) ? trim($_GET['status']) : '';
 $search_filter = isset($_GET['search']) ? trim($_GET['search']) : '';
 
 // Get assets with category and office information
 $assets = [];
 try {
-    $sql = "SELECT a.*, ac.category_name, ac.category_code, o.office_name
+    $sql = "SELECT a.*, ac.category_name, ac.category_code, o.office_name,
+                   (SELECT ai.status FROM asset_items ai WHERE ai.asset_id = a.id GROUP BY ai.status ORDER BY COUNT(*) DESC LIMIT 1) as most_common_status
             FROM assets a 
             LEFT JOIN asset_categories ac ON a.asset_categories_id = ac.id 
             LEFT JOIN offices o ON a.office_id = o.id 
@@ -259,6 +261,12 @@ try {
         $sql .= " AND a.office_id = ?";
         $params[] = $office_filter;
         $types .= 'i';
+    }
+    
+    if (!empty($status_filter)) {
+        $sql .= " AND EXISTS (SELECT 1 FROM asset_items ai WHERE ai.asset_id = a.id AND ai.status = ?)";
+        $params[] = $status_filter;
+        $types .= 's';
     }
     
     if (!empty($search_filter)) {
@@ -513,12 +521,6 @@ try {
             </div>
             <div class="col-lg-2 col-md-6">
                 <div class="stats-card">
-                    <div class="stats-number"><?php echo number_format($stats['total_value'] ?? 0, 2); ?></div>
-                    <div class="stats-label"><i class="bi bi-currency-dollar"></i> Total Value</div>
-                </div>
-            </div>
-            <div class="col-lg-2 col-md-6">
-                <div class="stats-card">
                     <div class="stats-number"><?php echo $stats['total_categories'] ?? 0; ?></div>
                     <div class="stats-label"><i class="bi bi-tags"></i> Categories</div>
                 </div>
@@ -539,7 +541,7 @@ try {
                 </div>
                 <div class="col-md-6">
                     <div class="row g-2">
-                        <div class="col-md-6">
+                        <div class="col-md-4">
                             <select class="form-select form-select-sm" id="categoryFilter">
                                 <option value="">All Categories</option>
                                 <?php foreach ($categories as $category): ?>
@@ -549,7 +551,7 @@ try {
                                 <?php endforeach; ?>
                             </select>
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-md-4">
                             <select class="form-select form-select-sm" id="officeFilter">
                                 <option value="">All Offices</option>
                                 <?php foreach ($offices as $office): ?>
@@ -557,6 +559,15 @@ try {
                                         <?php echo htmlspecialchars($office['office_name']); ?>
                                     </option>
                                 <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <select class="form-select form-select-sm" id="statusFilter">
+                                <option value="">All Status</option>
+                                <option value="no_tag" <?php echo $status_filter == 'no_tag' ? 'selected' : ''; ?>>No Tag</option>
+                                <option value="serviceable" <?php echo $status_filter == 'serviceable' ? 'selected' : ''; ?>>Serviceable</option>
+                                <option value="unserviceable" <?php echo $status_filter == 'unserviceable' ? 'selected' : ''; ?>>Unserviceable</option>
+                                <option value="red_tagged" <?php echo $status_filter == 'red_tagged' ? 'selected' : ''; ?>>Red Tagged</option>
                             </select>
                         </div>
                     </div>
@@ -570,7 +581,7 @@ try {
                             <th>Category</th>
                             <th>Description</th>
                             <th>Quantity</th>
-                            <th>Total Value</th>
+                            <th>Status</th>
                             <th>Office</th>
                             <th>Created</th>
                             <th>Actions</th>
@@ -589,7 +600,39 @@ try {
                                     </td>
                                     <td><?php echo htmlspecialchars($asset['description']); ?></td>
                                     <td><?php echo $asset['quantity']; ?></td>
-                                    <td class="text-value"><?php echo number_format($asset['quantity'] * $asset['unit_cost'], 2); ?></td>
+                                    <td>
+                                        <?php
+                                        // Use the pre-calculated most common status
+                                        $status = $asset['most_common_status'] ?? 'unknown';
+                                        $status_class = '';
+                                        $status_icon = '';
+                                        
+                                        switch($status) {
+                                            case 'no_tag':
+                                                $status_class = 'bg-danger';
+                                                $status_icon = 'bi-exclamation-triangle';
+                                                break;
+                                            case 'serviceable':
+                                                $status_class = 'bg-success';
+                                                $status_icon = 'bi-check-circle';
+                                                break;
+                                            case 'unserviceable':
+                                                $status_class = 'bg-danger';
+                                                $status_icon = 'bi-x-circle';
+                                                break;
+                                            case 'red_tagged':
+                                                $status_class = 'bg-danger';
+                                                $status_icon = 'bi-flag';
+                                                break;
+                                            default:
+                                                $status_class = 'bg-secondary';
+                                                $status_icon = 'bi-question-circle';
+                                        }
+                                        ?>
+                                        <span class="badge <?php echo $status_class; ?>">
+                                            <i class="bi <?php echo $status_icon; ?>"></i> <?php echo ucfirst(str_replace('_', ' ', $status)); ?>
+                                        </span>
+                                    </td>
                                     <td><?php echo htmlspecialchars($asset['office_name'] ?? 'N/A'); ?></td>
                                     <td><small><?php echo date('M j, Y', strtotime($asset['created_at'])); ?></small></td>
                                     <td>
@@ -794,7 +837,7 @@ try {
                 responsive: true,
                 pageLength: 25,
                 lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
-                order: [[5, 'desc']], // Sort by Created date column (index 5) by default
+                order: [[4, 'desc']], // Sort by Created date column (index 4) by default
                 columnDefs: [
                     {
                         targets: 0, // Category column
@@ -807,18 +850,7 @@ try {
                         }
                     },
                     {
-                        targets: 3, // Total Value column
-                        orderable: true,
-                        render: function(data, type, row) {
-                            if (type === 'sort' || type === 'type') {
-                                // Remove formatting and convert to number for sorting
-                                return parseFloat(data.replace(/[^0-9.-]+/g, ''));
-                            }
-                            return data;
-                        }
-                    },
-                    {
-                        targets: 5, // Created date column
+                        targets: 4, // Created date column
                         orderable: true,
                         render: function(data, type, row) {
                             if (type === 'sort' || type === 'type') {
@@ -864,9 +896,19 @@ try {
             $('#officeFilter').on('change', function() {
                 const officeValue = this.value;
                 if (officeValue) {
-                    assetsTable.column(4).search($(this).find('option:selected').text()).draw();
+                    assetsTable.column(5).search($(this).find('option:selected').text()).draw();
                 } else {
-                    assetsTable.column(4).search('').draw();
+                    assetsTable.column(5).search('').draw();
+                }
+            });
+            
+            // Status filter
+            $('#statusFilter').on('change', function() {
+                const statusValue = this.value;
+                if (statusValue) {
+                    assetsTable.column(3).search($(this).find('option:selected').text()).draw();
+                } else {
+                    assetsTable.column(3).search('').draw();
                 }
             });
         });
@@ -875,14 +917,14 @@ try {
         function exportAssets() {
             // Use DataTables export functionality
             const data = assetsTable.data().toArray();
-            let csv = 'Category,Description,Quantity,Total Value,Office,Created\n';
+            let csv = 'Category,Description,Quantity,Status,Office,Created\n';
             
             data.forEach(row => {
                 const rowData = [
                     row[0].replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim(), // Category
                     row[1], // Description
                     row[2], // Quantity
-                    row[3].replace(/[^0-9.-]+/g, ''), // Total Value
+                    row[3].replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim(), // Status
                     row[4], // Office
                     row[5]  // Created
                 ];
