@@ -319,20 +319,8 @@ try {
                     <p class="text-muted mb-0">View and print inventory tags for all tagged assets</p>
                 </div>
                 <div class="col-md-4 text-md-end">
-                    <button type="button" class="btn btn-warning btn-sm me-2" onclick="alert('Test works!')">
-                        <i class="bi bi-bug"></i> Test
-                    </button>
-                    <button type="button" class="btn btn-secondary btn-sm me-2" onclick="window.open('print_inventory_tag.php?id=48', '_blank')">
-                        <i class="bi bi-printer"></i> Test Print
-                    </button>
                     <button type="button" class="btn btn-success" onclick="printSelectedTags()">
                         <i class="bi bi-printer"></i> Print Selected
-                    </button>
-                    <button type="button" class="btn btn-info btn-sm ms-2" onclick="printAllTags()">
-                        <i class="bi bi-printer-fill"></i> Print All
-                    </button>
-                    <button type="button" class="btn btn-outline-primary btn-sm ms-2" onclick="exportToCSV()">
-                        <i class="bi bi-download"></i> Export
                     </button>
                 </div>
             </div>
@@ -413,7 +401,6 @@ try {
                                     <th>Office</th>
                                     <th>Person Accountable</th>
                                     <th>Status</th>
-                                    <th>QR Code</th>
                                     <th width="80" class="no-print">Actions</th>
                                 </tr>
                             </thead>
@@ -473,17 +460,6 @@ try {
                                                 <?php echo ucfirst(htmlspecialchars($tag['status'])); ?>
                                             </span>
                                         </td>
-                                        <td>
-                                            <?php if ($tag['qr_code']): ?>
-                                                <img src="../uploads/qr_codes/<?php echo htmlspecialchars($tag['qr_code']); ?>" 
-                                                     alt="QR Code" 
-                                                     class="img-fluid rounded"
-                                                     style="max-width: 60px; max-height: 60px; cursor: pointer;"
-                                                     onclick="showImageModal('../uploads/qr_codes/<?php echo htmlspecialchars($tag['qr_code']); ?>')">
-                                            <?php else: ?>
-                                                <i class="bi bi-qr-code-scan fs-4 text-muted"></i>
-                                            <?php endif; ?>
-                                        </td>
                                         <td class="no-print">
                                             <button type="button" class="btn btn-sm btn-primary btn-action" onclick="printTag(<?php echo $tag['id']; ?>)">
                                                 <i class="bi bi-printer"></i>
@@ -532,6 +508,28 @@ try {
         </div>
     </div>
 
+    <!-- Selection Alert Modal -->
+    <div class="modal fade" id="selectionAlertModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-warning text-dark">
+                    <h5 class="modal-title"><i class="bi bi-exclamation-triangle"></i> No Selection</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <i class="bi bi-check-square fs-1 text-warning mb-3"></i>
+                    <h6>Please select at least one tag to print.</h6>
+                    <p class="text-muted mb-0">Choose one or more inventory tags from the list before clicking the Print Selected button.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal">
+                        <i class="bi bi-check-circle"></i> OK
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <?php require_once 'includes/logout-modal.php'; ?>
     <?php require_once 'includes/change-password-modal.php'; ?>
     
@@ -564,7 +562,9 @@ try {
         function printSelectedTags() {
             const checkboxes = document.querySelectorAll('.tag-checkbox:checked');
             if (checkboxes.length === 0) {
-                alert('Please select at least one tag to print.');
+                // Show modal instead of alert
+                const modal = new bootstrap.Modal(document.getElementById('selectionAlertModal'));
+                modal.show();
                 return;
             }
 
