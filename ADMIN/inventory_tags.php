@@ -25,6 +25,7 @@ logSystemAction($_SESSION['user_id'], 'access', 'inventory_tags', 'Admin accesse
 // Handle search and filter
 $search = trim($_GET['search'] ?? '');
 $office_filter = intval($_GET['office'] ?? 0);
+$category_filter = intval($_GET['category'] ?? 0);
 $status_filter = $_GET['status'] ?? '';
 
 // Build WHERE clause
@@ -45,6 +46,12 @@ if (!empty($search)) {
 if ($office_filter > 0) {
     $where_conditions[] = "ai.office_id = ?";
     $params[] = $office_filter;
+    $types .= 'i';
+}
+
+if ($category_filter > 0) {
+    $where_conditions[] = "COALESCE(ai.category_id, a.asset_categories_id) = ?";
+    $params[] = $category_filter;
     $types .= 'i';
 }
 
@@ -101,6 +108,19 @@ try {
     }
 } catch (Exception $e) {
     error_log("Error fetching offices: " . $e->getMessage());
+}
+
+// Get categories for filter
+$categories = [];
+try {
+    $result = $conn->query("SELECT id, category_name, category_code FROM asset_categories WHERE status = 'active' ORDER BY category_name");
+    if ($result) {
+        while ($row = $result->fetch_assoc()) {
+            $categories[] = $row;
+        }
+    }
+} catch (Exception $e) {
+    error_log("Error fetching categories: " . $e->getMessage());
 }
 
 // Get statistics
@@ -351,15 +371,15 @@ try {
 
         <!-- Search and Filters -->
         <div class="filter-section no-print">
-            <form method="GET" class="row g-3">
-                <div class="col-md-4">
+            <form id="filterForm" class="row g-3">
+                <div class="col-md-3">
                     <div class="search-box">
                         <i class="bi bi-search"></i>
-                        <input type="text" name="search" class="form-control" placeholder="Search by tag, property no, description, or employee..." value="<?php echo htmlspecialchars($search); ?>">
+                        <input type="text" name="search" id="searchInput" class="form-control" placeholder="Search by tag, property no, description, or employee..." value="<?php echo htmlspecialchars($search); ?>">
                     </div>
                 </div>
                 <div class="col-md-3">
-                    <select name="office" class="form-select">
+                    <select name="office" id="officeFilter" class="form-select">
                         <option value="">All Offices</option>
                         <?php foreach ($offices as $office): ?>
                             <option value="<?php echo $office['id']; ?>" <?php echo $office_filter == $office['id'] ? 'selected' : ''; ?>>
@@ -369,16 +389,20 @@ try {
                     </select>
                 </div>
                 <div class="col-md-3">
-                    <select name="status" class="form-select">
+                    <select name="category" id="categoryFilter" class="form-select">
+                        <option value="">All Categories</option>
+                        <?php foreach ($categories as $category): ?>
+                            <option value="<?php echo $category['id']; ?>" <?php echo $category_filter == $category['id'] ? 'selected' : ''; ?>>
+                                <?php echo htmlspecialchars($category['category_code'] . ' - ' . $category['category_name']); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <select name="status" id="statusFilter" class="form-select">
                         <option value="">All Serviceable Items</option>
                         <option value="serviceable" <?php echo $status_filter == 'serviceable' ? 'selected' : ''; ?>>Serviceable</option>
                     </select>
-                </div>
-                <div class="col-md-2">
-                    <button type="submit" class="btn btn-primary w-100">
-                        <i class="bi bi-funnel"></i>
-                        Filter
-                    </button>
                 </div>
             </form>
         </div>
@@ -476,13 +500,13 @@ try {
                     <i class="bi bi-tags"></i>
                     <h5>No Inventory Tags Found</h5>
                     <p class="text-muted">
-                        <?php if (!empty($search) || $office_filter > 0 || !empty($status_filter)): ?>
+                        <?php if (!empty($search) || $office_filter > 0 || $category_filter > 0 || !empty($status_filter)): ?>
                             No inventory tags match your search criteria. Try adjusting your filters.
                         <?php else: ?>
                             No inventory tags have been created yet. Start by creating tags for your assets.
                         <?php endif; ?>
                     </p>
-                    <?php if (!empty($search) || $office_filter > 0 || !empty($status_filter)): ?>
+                    <?php if (!empty($search) || $office_filter > 0 || $category_filter > 0 || !empty($status_filter)): ?>
                         <a href="inventory_tags.php" class="btn btn-outline-primary">
                             <i class="bi bi-arrow-clockwise"></i>
                             Clear Filters
@@ -587,6 +611,52 @@ try {
             // Simple CSV export without complex PHP generation
             window.location.href = 'inventory_tags.php?export=csv';
         }
+
+        // Automatic filtering
+        document.addEventListener('DOMContentLoaded', function() {
+            const searchInput = document.getElementById('searchInput');
+            const officeFilter = document.getElementById('officeFilter');
+            const categoryFilter = document.getElementById('categoryFilter');
+            const statusFilter = document.getElementById('statusFilter');
+            const filterForm = document.getElementById('filterForm');
+
+            // Function to submit form with current filter values
+            function applyFilters() {
+                const formData = new FormData(filterForm);
+                const params = new URLSearchParams();
+                
+                // Add all form parameters to URL
+                for (let [key, value] of formData.entries()) {
+                    if (value) {
+                        params.append(key, value);
+                    }
+                }
+                
+                // Redirect to current page with filter parameters
+                window.location.href = 'inventory_tags.php?' + params.toString();
+            }
+
+            // Add event listeners for automatic filtering
+            if (searchInput) {
+                let searchTimeout;
+                searchInput.addEventListener('input', function() {
+                    clearTimeout(searchTimeout);
+                    searchTimeout = setTimeout(applyFilters, 500); // Wait 500ms after typing stops
+                });
+            }
+
+            if (officeFilter) {
+                officeFilter.addEventListener('change', applyFilters);
+            }
+
+            if (categoryFilter) {
+                categoryFilter.addEventListener('change', applyFilters);
+            }
+
+            if (statusFilter) {
+                statusFilter.addEventListener('change', applyFilters);
+            }
+        });
     </script>
     </div>
 </body>
