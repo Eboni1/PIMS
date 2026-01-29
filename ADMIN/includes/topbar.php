@@ -7,6 +7,13 @@
         </a>
         
         <div class="navbar-nav ms-auto align-items-center">
+            <!-- QR Scanner -->
+            <div class="nav-item me-3">
+                <a href="scan_qr.php" class="nav-link text-white" title="QR Scanner">
+                    <i class="bi bi-qr-code-scan"></i>
+                </a>
+            </div>
+            
             <!-- Search Bar -->
             <div class="nav-item me-3">
                 <div class="search-container position-relative">
