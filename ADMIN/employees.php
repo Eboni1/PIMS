@@ -36,7 +36,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['a
     $office_id = intval($_POST['office_id'] ?? 0);
     $position = trim($_POST['position'] ?? '');
     $employment_status = trim($_POST['employment_status'] ?? 'permanent');
-    $clearance_status = trim($_POST['clearance_status'] ?? 'uncleared');
     
     // Handle profile photo upload
     $profile_photo = $_POST['current_photo'] ?? '';
@@ -92,9 +91,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['a
                 $message_type = "danger";
             } else {
                 // Update employee
-                $update_sql = "UPDATE employees SET firstname = ?, lastname = ?, email = ?, phone = ?, office_id = ?, position = ?, employment_status = ?, clearance_status = ?, profile_photo = ? WHERE id = ?";
+                $update_sql = "UPDATE employees SET firstname = ?, lastname = ?, email = ?, phone = ?, office_id = ?, position = ?, employment_status = ?, profile_photo = ? WHERE id = ?";
                 $update_stmt = $conn->prepare($update_sql);
-                $update_stmt->bind_param("sssisssssi", $firstname, $lastname, $email, $phone, $office_id, $position, $employment_status, $clearance_status, $profile_photo, $id);
+                $update_stmt->bind_param("sssissssi", $firstname, $lastname, $email, $phone, $office_id, $position, $employment_status, $profile_photo, $id);
                 
                 if ($update_stmt->execute()) {
                     logSystemAction($_SESSION['user_id'], 'update', 'employees', "Updated employee: $firstname $lastname");
@@ -980,13 +979,6 @@ $showing_to = min($page * $per_page, $total_records);
                                     <option value="job_order" <?php echo (isset($edit_employee['employment_status']) && $edit_employee['employment_status'] == 'job_order') ? 'selected' : ''; ?>>Job Order</option>
                                     <option value="resigned" <?php echo (isset($edit_employee['employment_status']) && $edit_employee['employment_status'] == 'resigned') ? 'selected' : ''; ?>>Resigned</option>
                                     <option value="retired" <?php echo (isset($edit_employee['employment_status']) && $edit_employee['employment_status'] == 'retired') ? 'selected' : ''; ?>>Retired</option>
-                                </select>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label for="editClearanceStatus" class="form-label">Clearance Status *</label>
-                                <select class="form-select" id="editClearanceStatus" name="clearance_status" required>
-                                    <option value="cleared" <?php echo (isset($edit_employee['clearance_status']) && $edit_employee['clearance_status'] == 'cleared') ? 'selected' : ''; ?>>Cleared</option>
-                                    <option value="uncleared" <?php echo (isset($edit_employee['clearance_status']) && $edit_employee['clearance_status'] == 'uncleared') ? 'selected' : ''; ?>>Uncleared</option>
                                 </select>
                             </div>
                         </div>
