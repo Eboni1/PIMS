@@ -593,14 +593,14 @@ function formatStatus($status) {
         <!-- Filters Section -->
         <div class="filter-card no-print">
             <h5 class="mb-3"><i class="bi bi-funnel"></i> Filters</h5>
-            <form method="GET" action="reports.php">
+            <form id="filterForm" method="GET" action="reports.php">
                 <input type="hidden" name="type" value="<?php echo $report_type; ?>">
                 
                 <?php if ($report_type === 'assets'): ?>
                     <div class="row">
                         <div class="col-md-3">
                             <label class="form-label">Office</label>
-                            <select name="office" class="form-select">
+                            <select name="office" class="form-select" onchange="document.getElementById('filterForm').submit()">
                                 <option value="">All Offices</option>
                                 <?php foreach ($offices as $office): ?>
                                     <option value="<?php echo $office['id']; ?>" <?php echo $office_filter == $office['id'] ? 'selected' : ''; ?>>
@@ -611,7 +611,7 @@ function formatStatus($status) {
                         </div>
                         <div class="col-md-3">
                             <label class="form-label">Category</label>
-                            <select name="category" class="form-select">
+                            <select name="category" class="form-select" onchange="document.getElementById('filterForm').submit()">
                                 <option value="">All Categories</option>
                                 <?php foreach ($categories as $category): ?>
                                     <option value="<?php echo $category['id']; ?>" <?php echo $category_filter == $category['id'] ? 'selected' : ''; ?>>
@@ -622,7 +622,7 @@ function formatStatus($status) {
                         </div>
                         <div class="col-md-2">
                             <label class="form-label">Status</label>
-                            <select name="status" class="form-select">
+                            <select name="status" class="form-select" onchange="document.getElementById('filterForm').submit()">
                                 <option value="">All Status</option>
                                 <?php foreach ($asset_statuses as $status): ?>
                                     <option value="<?php echo $status; ?>" <?php echo $status_filter === $status ? 'selected' : ''; ?>>
@@ -633,18 +633,18 @@ function formatStatus($status) {
                         </div>
                         <div class="col-md-2">
                             <label class="form-label">Date From</label>
-                            <input type="date" name="date_from" class="form-control" value="<?php echo htmlspecialchars($date_from); ?>">
+                            <input type="date" name="date_from" class="form-control" value="<?php echo htmlspecialchars($date_from); ?>" onchange="document.getElementById('filterForm').submit()">
                         </div>
                         <div class="col-md-2">
                             <label class="form-label">Date To</label>
-                            <input type="date" name="date_to" class="form-control" value="<?php echo htmlspecialchars($date_to); ?>">
+                            <input type="date" name="date_to" class="form-control" value="<?php echo htmlspecialchars($date_to); ?>" onchange="document.getElementById('filterForm').submit()">
                         </div>
                     </div>
                 <?php elseif ($report_type === 'employees'): ?>
                     <div class="row">
                         <div class="col-md-3">
                             <label class="form-label">Employment Status</label>
-                            <select name="employee_status" class="form-select">
+                            <select name="employee_status" class="form-select" onchange="document.getElementById('filterForm').submit()">
                                 <option value="">All Status</option>
                                 <?php foreach ($employment_statuses as $status): ?>
                                     <option value="<?php echo $status; ?>" <?php echo $employee_status_filter === $status ? 'selected' : ''; ?>>
@@ -655,7 +655,7 @@ function formatStatus($status) {
                         </div>
                         <div class="col-md-3">
                             <label class="form-label">Clearance Status</label>
-                            <select name="clearance_status" class="form-select">
+                            <select name="clearance_status" class="form-select" onchange="document.getElementById('filterForm').submit()">
                                 <option value="">All Status</option>
                                 <?php foreach ($clearance_statuses as $status): ?>
                                     <option value="<?php echo $status; ?>" <?php echo $clearance_status_filter === $status ? 'selected' : ''; ?>>
@@ -669,11 +669,8 @@ function formatStatus($status) {
                 
                 <div class="row mt-3">
                     <div class="col-12">
-                        <button type="submit" class="btn btn-report">
-                            <i class="bi bi-search"></i> Apply Filters
-                        </button>
                         <a href="reports.php?type=<?php echo $report_type; ?>" class="btn btn-outline-secondary">
-                            <i class="bi bi-x-circle"></i> Clear
+                            <i class="bi bi-x-circle"></i> Clear Filters
                         </a>
                     </div>
                 </div>
