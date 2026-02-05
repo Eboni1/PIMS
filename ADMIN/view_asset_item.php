@@ -751,18 +751,28 @@ $status_display = formatStatus($item['status']);
                             <a href="create_tag.php?id=<?php echo $item_id; ?>" class="btn btn-primary">
                                 <i class="bi bi-tag"></i> Create Tag
                             </a>
-                        <?php elseif ($item['status'] === 'serviceable' || $item['status'] === 'red_tagged'): ?>
-                            <!-- Show Transfer and IIRUP buttons for serviceable and red_tagged assets -->
+                        <?php elseif ($item['status'] === 'serviceable'): ?>
+                            <!-- Show Transfer and IIRUP buttons for serviceable assets only -->
                             <button class="btn btn-outline-success" onclick="transferItem()">
                                 <i class="bi bi-arrow-left-right"></i> Transfer Item
                             </button>
                             <button class="btn btn-outline-info" onclick="addToIirup()">
                                 <i class="bi bi-file-earmark-text"></i> Add to IIRUP
                             </button>
-                        <?php else: ?>
-                            <!-- No action buttons for unserviceable assets -->
+                        <?php elseif ($item['status'] === 'red_tagged'): ?>
+                            <!-- No action buttons for red_tagged assets -->
                             <div class="text-muted text-center">
-                                <i class="bi bi-info-circle"></i> This asset is unserviceable and cannot be transferred or added to IIRUP
+                                <i class="bi bi-info-circle"></i> No actions available for red-tagged assets
+                            </div>
+                        <?php elseif ($item['status'] === 'unserviceable'): ?>
+                            <!-- Show Create Red Tag button for unserviceable assets -->
+                            <a href="create_redtag.php?asset_id=<?php echo $item['id']; ?>&description=<?php echo urlencode($item['description']); ?>&property_no=<?php echo urlencode($item['property_no'] ?? ''); ?>&inventory_tag=<?php echo urlencode($item['inventory_tag'] ?? ''); ?>&acquisition_date=<?php echo $item['acquisition_date']; ?>&value=<?php echo $item['value']; ?>&office_name=<?php echo urlencode($item['office_name'] ?? ''); ?>" class="btn btn-danger">
+                                <i class="bi bi-exclamation-triangle"></i> Create Red Tag
+                            </a>
+                        <?php else: ?>
+                            <!-- No action buttons for other statuses -->
+                            <div class="text-muted text-center">
+                                <i class="bi bi-info-circle"></i> No actions available for this asset status
                             </div>
                         <?php endif; ?>
                     </div>
