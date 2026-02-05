@@ -1,4 +1,5 @@
 <?php
+// File updated: 2025-02-05 12:53:00 - Fixed JavaScript syntax errors
 session_start();
 require_once '../config.php';
 require_once '../includes/logger.php';
@@ -83,6 +84,11 @@ $where_clause = !empty($where_conditions) ? 'WHERE ' . implode(' AND ', $where_c
 $data = [];
 $total_value = 0;
 $total_count = 0;
+
+// Ensure data is always an array to prevent JavaScript errors
+if (!isset($data) || !is_array($data)) {
+    $data = [];
+}
 
 if ($report_type === 'assets') {
     // Asset report query
@@ -289,6 +295,14 @@ $employment_statuses = ['permanent', 'contractual', 'job_order', 'resigned', 're
 // Clearance status options
 $clearance_statuses = ['cleared', 'uncleared'];
 
+// Initialize variables to prevent undefined variable notices
+$total_assets = $total_assets ?? 0;
+$total_asset_value = $total_asset_value ?? 0;
+$total_employees = $total_employees ?? 0;
+$total_offices = $total_offices ?? 0;
+$asset_stats = $asset_stats ?? [];
+$employee_stats = $employee_stats ?? [];
+
 // Format status for display
 function formatStatus($status) {
     $status_map = [
@@ -313,16 +327,19 @@ function formatStatus($status) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>Reports - PIMS</title>
     <!-- Bootstrap CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css?v=<?php echo time(); ?>" rel="stylesheet">
     <!-- Bootstrap Icons -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.3/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.3/font/bootstrap-icons.css?v=<?php echo time(); ?>">
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <!-- Custom CSS -->
-    <link href="../assets/css/index.css" rel="stylesheet">
-    <link href="../assets/css/theme-custom.css" rel="stylesheet">
+    <link href="../assets/css/index.css?v=<?php echo time(); ?>" rel="stylesheet">
+    <link href="../assets/css/theme-custom.css?v=<?php echo time(); ?>" rel="stylesheet">
     <style>
         body {
             font-family: 'Inter', sans-serif;
@@ -922,51 +939,41 @@ function formatStatus($status) {
     </div>
     
     <!-- Bootstrap JS -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js?v=<?php echo time(); ?>"></script>
     <?php require_once 'includes/sidebar-scripts.php'; ?>
+    
+    <!-- Global Report Functions - Define immediately to ensure availability -->
     <script>
-        function printReport() {
-            const reportType = '<?php echo $report_type; ?>';
+        // Force refresh - updated at <?php echo time(); ?>
+        
+        // Define functions in global scope
+        window.printReport = function() {
+            const reportType = <?php echo json_encode($report_type, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+            console.log('Print report type:', reportType);
             
-            // Build URL with current filters
-            let printUrl = 'print_reports.php?type=' + reportType;
+            // Build URL with all current parameters
+            const currentUrl = new URL(window.location.href);
+            const params = new URLSearchParams(currentUrl.search);
             
-            // Add current filters to URL
-            <?php if ($office_filter > 0): ?>
-                printUrl += '&office=<?php echo $office_filter; ?>';
-            <?php endif; ?>
+            // Set the print_reports.php as the target
+            const printUrl = 'print_reports.php?' + params.toString();
             
-            <?php if ($category_filter > 0): ?>
-                printUrl += '&category=<?php echo $category_filter; ?>';
-            <?php endif; ?>
-            
-            <?php if (!empty($status_filter)): ?>
-                printUrl += '&status=<?php echo urlencode($status_filter); ?>';
-            <?php endif; ?>
-            
-            <?php if (!empty($date_from)): ?>
-                printUrl += '&date_from=<?php echo $date_from; ?>';
-            <?php endif; ?>
-            
-            <?php if (!empty($date_to)): ?>
-                printUrl += '&date_to=<?php echo $date_to; ?>';
-            <?php endif; ?>
-            
-            <?php if (!empty($employee_status_filter)): ?>
-                printUrl += '&employee_status=<?php echo urlencode($employee_status_filter); ?>';
-            <?php endif; ?>
-            
-            <?php if (!empty($clearance_status_filter)): ?>
-                printUrl += '&clearance_status=<?php echo urlencode($clearance_status_filter); ?>';
-            <?php endif; ?>
+            console.log('Print URL:', printUrl);
             
             // Open print window
-            const printWindow = window.open(printUrl, '_blank');
-            printWindow.focus();
-        }
+            try {
+                const printWindow = window.open(printUrl, '_blank', 'width=1000,height=800');
+                if (!printWindow) {
+                    alert('Please allow popups for this site to print reports.');
+                }
+            } catch (error) {
+                console.error('Error opening print window:', error);
+                alert('Error opening print window: ' + error.message);
+            }
+        };
         
-        function exportReport() {
-            const reportType = '<?php echo $report_type; ?>';
+        window.exportReport = function() {
+            const reportType = <?php echo json_encode($report_type, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
             let csvContent = '';
             let fileName = '';
             
@@ -976,19 +983,34 @@ function formatStatus($status) {
                 csvContent = 'Property No,Inventory Tag,Description,Category,Office,Status,Value,Acquisition Date,Assigned To\n';
                 
                 // CSV data
-                <?php foreach ($data as $item): ?>
-                    csvContent += '<?php 
-                        echo '"' . addslashes($item['property_no'] ?? 'N/A') . '",';
-                        echo '"' . addslashes($item['inventory_tag'] ?? 'N/A') . '",';
-                        echo '"' . addslashes($item['description']) . '",';
-                        echo '"' . addslashes($item['category_code'] ?? '') . '",';
-                        echo '"' . addslashes($item['office_name'] ?? 'N/A') . '",';
-                        echo '"' . addslashes(ucfirst(str_replace('_', ' ', $item['status']))) . '",';
-                        echo '"' . number_format($item['value'], 2) . '",';
-                        echo '"' . date('M j, Y', strtotime($item['acquisition_date'])) . '",';
-                        echo '"' . addslashes(($item['employee_no'] ? $item['employee_no'] . ' - ' . $item['firstname'] . ' ' . $item['lastname'] : 'Unassigned')) . '"';
-                    ?>\n';
-                <?php endforeach; ?>
+                const assetData = <?php 
+                    if (empty($data)) {
+                        echo '[]';
+                    } else {
+                        echo json_encode(array_map(function($item) {
+                            return [
+                                isset($item['property_no']) ? $item['property_no'] : 'N/A',
+                                isset($item['inventory_tag']) ? $item['inventory_tag'] : 'N/A',
+                                isset($item['description']) ? $item['description'] : '',
+                                isset($item['category_code']) ? $item['category_code'] : '',
+                                isset($item['office_name']) ? $item['office_name'] : 'N/A',
+                                isset($item['status']) ? ucfirst(str_replace('_', ' ', $item['status'])) : '',
+                                isset($item['value']) ? number_format($item['value'], 2) : '0.00',
+                                isset($item['acquisition_date']) ? date('M j, Y', strtotime($item['acquisition_date'])) : 'N/A',
+                                (isset($item['employee_no']) && $item['employee_no']) ? 
+                                    $item['employee_no'] . ' - ' . (isset($item['firstname']) ? $item['firstname'] : '') . ' ' . (isset($item['lastname']) ? $item['lastname'] : '') : 'Unassigned'
+                            ];
+                        }, $data), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
+                    }
+                ?>;
+                
+                if (Array.isArray(assetData)) {
+                    assetData.forEach(function(row) {
+                        csvContent += row.map(function(field) {
+                            return '"' + String(field).replace(/"/g, '""') + '"';
+                        }).join(',') + '\n';
+                    });
+                }
                 
             } else if (reportType === 'employees') {
                 fileName = 'employee_report_' + new Date().toISOString().split('T')[0] + '.csv';
@@ -996,19 +1018,33 @@ function formatStatus($status) {
                 csvContent = 'Employee No,Name,Position,Office,Employment Status,Clearance Status,Date Added,Email,Phone\n';
                 
                 // CSV data
-                <?php foreach ($data as $employee): ?>
-                    csvContent += '<?php 
-                        echo '"' . addslashes($employee['employee_no']) . '",';
-                        echo '"' . addslashes($employee['firstname'] . ' ' . $employee['lastname']) . '",';
-                        echo '"' . addslashes($employee['position'] ?? 'N/A') . '",';
-                        echo '"' . addslashes($employee['office_name'] ?? 'N/A') . '",';
-                        echo '"' . addslashes(ucfirst(str_replace('_', ' ', $employee['employment_status']))) . '",';
-                        echo '"' . addslashes(ucfirst($employee['clearance_status'])) . '",';
-                        echo '"' . ($employee['created_at'] ? date('M j, Y', strtotime($employee['created_at'])) : 'N/A') . '",';
-                        echo '"' . addslashes($employee['email'] ?? '') . '",';
-                        echo '"' . addslashes($employee['phone'] ?? '') . '"';
-                    ?>\n';
-                <?php endforeach; ?>
+                const employeeData = <?php 
+                    if (empty($data)) {
+                        echo '[]';
+                    } else {
+                        echo json_encode(array_map(function($employee) {
+                            return [
+                                isset($employee['employee_no']) ? $employee['employee_no'] : '',
+                                (isset($employee['firstname']) ? $employee['firstname'] : '') . ' ' . (isset($employee['lastname']) ? $employee['lastname'] : ''),
+                                isset($employee['position']) ? $employee['position'] : 'N/A',
+                                isset($employee['office_name']) ? $employee['office_name'] : 'N/A',
+                                isset($employee['employment_status']) ? ucfirst(str_replace('_', ' ', $employee['employment_status'])) : '',
+                                isset($employee['clearance_status']) ? ucfirst($employee['clearance_status']) : '',
+                                isset($employee['created_at']) ? date('M j, Y', strtotime($employee['created_at'])) : 'N/A',
+                                isset($employee['email']) ? $employee['email'] : '',
+                                isset($employee['phone']) ? $employee['phone'] : ''
+                            ];
+                        }, $data), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
+                    }
+                ?>;
+                
+                if (Array.isArray(employeeData)) {
+                    employeeData.forEach(function(row) {
+                        csvContent += row.map(function(field) {
+                            return '"' + String(field).replace(/"/g, '""') + '"';
+                        }).join(',') + '\n';
+                    });
+                }
                 
             } else if (reportType === 'summary') {
                 fileName = 'summary_report_' + new Date().toISOString().split('T')[0] + '.csv';
@@ -1016,28 +1052,50 @@ function formatStatus($status) {
                 csvContent = 'Report Type,Total Count,Total Value,Notes\n';
                 
                 // Summary data
-                csvContent += 'Total Assets,' + <?php echo $total_assets; ?> + ',₱' + <?php echo $total_asset_value; ?> + ',Overall asset count and value\n';
-                csvContent += 'Total Employees,' + <?php echo $total_employees; ?> + ',N/A,Overall employee count\n';
-                csvContent += 'Total Offices,' + <?php echo $total_offices; ?> + ',N/A,Overall office count\n';
-                csvContent += 'Serviceable Assets,' + <?php echo $asset_stats['serviceable_count'] ?? 0; ?> + ',N/A,Assets in serviceable condition\n';
-                csvContent += 'Unserviceable Assets,' + <?php echo $asset_stats['unserviceable_count'] ?? 0; ?> + ',N/A,Assets in unserviceable condition\n';
-                csvContent += 'Red Tagged Assets,' + <?php echo $asset_stats['red_tagged_count'] ?? 0; ?> + ',N/A,Assets with red tags\n';
-                csvContent += 'Permanent Employees,' + <?php echo $employee_stats['permanent_count'] ?? 0; ?> + ',N/A,Permanent staff count\n';
-                csvContent += 'Contractual Employees,' + <?php echo $employee_stats['contractual_count'] ?? 0; ?> + ',N/A,Contractual staff count\n';
-                csvContent += 'Cleared Employees,' + <?php echo $employee_stats['cleared_count'] ?? 0; ?> + ',N/A,Employees with clearance\n';
+                const summaryData = [
+                    ['Total Assets', <?php echo (int)($total_assets ?? 0); ?>, '₱' + <?php echo (float)($total_asset_value ?? 0); ?>, 'Overall asset count and value'],
+                    ['Total Employees', <?php echo (int)($total_employees ?? 0); ?>, 'N/A', 'Overall employee count'],
+                    ['Total Offices', <?php echo (int)($total_offices ?? 0); ?>, 'N/A', 'Overall office count'],
+                    ['Serviceable Assets', <?php echo (int)($asset_stats['serviceable_count'] ?? 0); ?>, 'N/A', 'Assets in serviceable condition'],
+                    ['Unserviceable Assets', <?php echo (int)($asset_stats['unserviceable_count'] ?? 0); ?>, 'N/A', 'Assets in unserviceable condition'],
+                    ['Red Tagged Assets', <?php echo (int)($asset_stats['red_tagged_count'] ?? 0); ?>, 'N/A', 'Assets with red tags'],
+                    ['Permanent Employees', <?php echo (int)($employee_stats['permanent_count'] ?? 0); ?>, 'N/A', 'Permanent staff count'],
+                    ['Contractual Employees', <?php echo (int)($employee_stats['contractual_count'] ?? 0); ?>, 'N/A', 'Contractual staff count'],
+                    ['Cleared Employees', <?php echo (int)($employee_stats['cleared_count'] ?? 0); ?>, 'N/A', 'Employees with clearance']
+                ];
+                
+                if (Array.isArray(summaryData)) {
+                    summaryData.forEach(function(row) {
+                        csvContent += row.map(function(field) {
+                            return '"' + String(field).replace(/"/g, '""') + '"';
+                        }).join(',') + '\n';
+                    });
+                }
             }
             
             // Create download link
-            const blob = new Blob([csvContent], { type: 'text/csv' });
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.setAttribute('hidden', '');
-            a.setAttribute('href', url);
-            a.setAttribute('download', fileName);
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-        }
+            try {
+                const blob = new Blob([csvContent], { type: 'text/csv' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.setAttribute('hidden', '');
+                a.setAttribute('href', url);
+                a.setAttribute('download', fileName);
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            } catch (error) {
+                console.error('Error creating download:', error);
+                alert('Error creating download: ' + error.message);
+            }
+        };
+        
+        // Debug: Log that functions are defined
+        console.log('Report functions defined:', {
+            printReport: typeof window.printReport,
+            exportReport: typeof window.exportReport
+        });
     </script>
 </body>
 </html>
