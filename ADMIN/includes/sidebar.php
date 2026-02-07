@@ -297,16 +297,16 @@ try {
             Dashboard
         </a>
         <div class="sidebar-dropdown">
-            <button class="sidebar-dropdown-toggle <?php echo (in_array($current_page, ['assets.php', 'consumables.php', 'no_inventory_tag.php', 'inventory_tags.php', 'unserviceable_assets.php', 'red_tags.php'])) ? 'active' : ''; ?>" 
+            <button class="sidebar-dropdown-toggle <?php echo (in_array($current_page, ['assets.php', 'consumables.php', 'fuel.php', 'no_inventory_tag.php', 'inventory_tags.php', 'unserviceable_assets.php', 'red_tags.php'])) ? 'active' : ''; ?>" 
                     type="button" data-bs-toggle="collapse" data-bs-target="#inventoryDropdown" 
-                    aria-expanded="<?php echo (in_array($current_page, ['assets.php', 'consumables.php', 'no_inventory_tag.php', 'inventory_tags.php', 'unserviceable_assets.php', 'red_tags.php'])) ? 'true' : 'false'; ?>">
+                    aria-expanded="<?php echo (in_array($current_page, ['assets.php', 'consumables.php', 'fuel.php', 'no_inventory_tag.php', 'inventory_tags.php', 'unserviceable_assets.php', 'red_tags.php'])) ? 'true' : 'false'; ?>">
                 <div>
                     <i class="bi bi-archive"></i>
                     Inventory
                 </div>
                 <i class="bi bi-chevron-down"></i>
             </button>
-            <div class="collapse <?php echo (in_array($current_page, ['assets.php', 'consumables.php', 'no_inventory_tag.php', 'inventory_tags.php', 'unserviceable_assets.php', 'red_tags.php'])) ? 'show' : ''; ?>" id="inventoryDropdown">
+            <div class="collapse <?php echo (in_array($current_page, ['assets.php', 'consumables.php', 'fuel.php', 'no_inventory_tag.php', 'inventory_tags.php', 'unserviceable_assets.php', 'red_tags.php'])) ? 'show' : ''; ?>" id="inventoryDropdown">
                 <ul class="sidebar-dropdown-menu">
                     <li>
                         <a href="assets.php" class="sidebar-dropdown-item <?php echo $current_page == 'assets.php' ? 'active' : ''; ?>">
@@ -330,6 +330,12 @@ try {
                         <a href="consumables.php" class="sidebar-dropdown-item <?php echo $current_page == 'consumables.php' ? 'active' : ''; ?>">
                             <i class="bi bi-archive"></i>
                             Consumables
+                        </a>
+                    </li>
+                    <li>
+                        <a href="fuel.php" class="sidebar-dropdown-item <?php echo $current_page == 'fuel.php' ? 'active' : ''; ?>">
+                            <i class="bi bi-fuel-pump"></i>
+                            Fuel Inventory
                         </a>
                     </li>
                     <li>
