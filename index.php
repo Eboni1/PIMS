@@ -346,12 +346,12 @@ if (isset($_GET['timeout']) && $_GET['timeout'] == '1') {
                             <form method="POST" action="" id="loginForm">
                                 <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
                                 <div class="form-floating mb-3">
-                                    <input type="email" class="form-control" id="email" name="email" placeholder="Email" required>
+                                    <input type="email" class="form-control" id="email" name="email" placeholder="Email" required autocomplete="off">
                                     <label for="email"><i class="bi bi-envelope"></i> Email Address</label>
                                 </div>
                                 
                                 <div class="form-floating mb-3 position-relative">
-                                    <input type="password" class="form-control" id="password" name="password" placeholder="Password" required>
+                                    <input type="password" class="form-control" id="password" name="password" placeholder="Password" required autocomplete="off">
                                     <label for="password"><i class="bi bi-lock"></i> Password</label>
                                     <i class="bi bi-eye position-absolute" style="right: 1rem; top: 50%; transform: translateY(-50%); cursor: pointer;" id="passwordToggle"></i>
                                 </div>

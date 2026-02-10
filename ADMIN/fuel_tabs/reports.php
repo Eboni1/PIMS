@@ -5,7 +5,6 @@ require_once '../config.php';
 $start_date = $_GET['start_date'] ?? date('Y-m-01');
 $end_date = $_GET['end_date'] ?? date('Y-m-t');
 $fuel_type_filter = $_GET['fuel_type'] ?? '';
-$tank_filter = $_GET['tank'] ?? '';
 
 // Build base query
 $where_conditions = ["transaction_date BETWEEN '$start_date' AND '$end_date'"];
@@ -15,12 +14,6 @@ $types = '';
 if ($fuel_type_filter) {
     $where_conditions[] = "fuel_type = ?";
     $params[] = $fuel_type_filter;
-    $types .= 's';
-}
-
-if ($tank_filter) {
-    $where_conditions[] = "tank_number = ?";
-    $params[] = $tank_filter;
     $types .= 's';
 }
 
@@ -59,12 +52,9 @@ if (!empty($params)) {
 $stmt->execute();
 $transactions_result = $stmt->get_result();
 
-// Get available fuel types and tanks for filters
+// Get available fuel types for filters
 $fuel_types_query = "SELECT DISTINCT fuel_type FROM fuel_transactions ORDER BY fuel_type";
 $fuel_types_result = $conn->query($fuel_types_query);
-
-$tanks_query = "SELECT DISTINCT tank_number FROM fuel_transactions WHERE tank_number IS NOT NULL ORDER BY tank_number";
-$tanks_result = $conn->query($tanks_query);
 ?>
 
 <div class="row mb-4">
@@ -91,7 +81,7 @@ $tanks_result = $conn->query($tanks_query);
                 <label class="form-label">End Date</label>
                 <input type="date" name="end_date" class="form-control" value="<?php echo $end_date; ?>" required>
             </div>
-            <div class="col-md-2">
+            <div class="col-md-3">
                 <label class="form-label">Fuel Type</label>
                 <select name="fuel_type" class="form-select">
                     <option value="">All Types</option>
@@ -102,18 +92,7 @@ $tanks_result = $conn->query($tanks_query);
                     <?php endwhile; ?>
                 </select>
             </div>
-            <div class="col-md-2">
-                <label class="form-label">Tank</label>
-                <select name="tank" class="form-select">
-                    <option value="">All Tanks</option>
-                    <?php while ($tank = $tanks_result->fetch_assoc()): ?>
-                        <option value="<?php echo $tank['tank_number']; ?>" <?php echo $tank_filter == $tank['tank_number'] ? 'selected' : ''; ?>>
-                            <?php echo htmlspecialchars($tank['tank_number']); ?>
-                        </option>
-                    <?php endwhile; ?>
-                </select>
-            </div>
-            <div class="col-md-2">
+            <div class="col-md-3">
                 <label class="form-label">&nbsp;</label>
                 <button type="submit" class="btn btn-primary w-100">
                     <i class="bi bi-funnel"></i> Apply Filters
@@ -181,7 +160,6 @@ $tanks_result = $conn->query($tanks_query);
                         <th>Quantity (L)</th>
                         <th>Employee/Source</th>
                         <th>Purpose/Supplier</th>
-                        <th>Tank</th>
                         <th>Recorded By</th>
                     </tr>
                 </thead>
@@ -222,7 +200,6 @@ $tanks_result = $conn->query($tanks_query);
                                         <?php echo htmlspecialchars($transaction['purpose']); ?>
                                     <?php endif; ?>
                                 </td>
-                                <td><?php echo htmlspecialchars($transaction['tank_number'] ?? 'N/A'); ?></td>
                                 <td>
                                     <?php echo htmlspecialchars($transaction['first_name'] . ' ' . $transaction['last_name']); ?>
                                 </td>
@@ -230,7 +207,7 @@ $tanks_result = $conn->query($tanks_query);
                         <?php endwhile; ?>
                     <?php else: ?>
                         <tr>
-                            <td colspan="9" class="text-center">
+                            <td colspan="8" class="text-center">
                                 <div class="py-4">
                                     <i class="bi bi-file-earmark-bar-graph" style="font-size: 3rem; color: #6c757d;"></i>
                                     <p class="mt-2 mb-0">No transactions found for the selected period</p>
@@ -263,11 +240,5 @@ function exportReport() {
     params.set('export', '1');
     
     window.open('fuel_tabs/export_fuel_report.php?' + params.toString(), '_blank');
-}
-
-function filterByTank(tankId) {
-    const url = new URL(window.location);
-    url.searchParams.set('tank', tankId);
-    window.location.href = url.toString();
 }
 </script>
