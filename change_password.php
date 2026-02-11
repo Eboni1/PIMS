@@ -9,6 +9,8 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
     exit();
 }
 
+//TESTES HOHO
+
 // Handle POST request
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $current_password = $_POST['current_password'] ?? '';
