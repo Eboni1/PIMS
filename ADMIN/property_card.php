@@ -34,13 +34,16 @@ if ($conn && !$conn->connect_error) {
                     ai.description,
                     ai.value,
                     ai.par_id,
-                    ai.employee_id
+                    ai.employee_id,
+                    COALESCE(ac.category_code, 'UNCAT') as asset_category
                   FROM asset_items ai
+                  LEFT JOIN asset_categories ac ON ai.category_id = ac.id
                   WHERE ai.par_id IS NOT NULL AND ai.par_id != ''
                   ORDER BY ai.created_at ASC";
         
         $result = $conn->query($query);
         if ($result) {
+            
             while ($row = $result->fetch_assoc()) {
                 // Add employee and PAR info separately
                 $row['employee_name'] = '';
@@ -208,6 +211,17 @@ if ($conn && !$conn->connect_error) {
             text-align: center;
         }
         
+        .category-badge {
+            background: rgba(25, 27, 169, 0.1);
+            color: #191BA9;
+            padding: 0.25rem 0.5rem;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            display: inline-block;
+            white-space: nowrap;
+        }
+        
         .date-cell {
             font-size: 0.85rem;
             color: #6c757d;
@@ -348,6 +362,7 @@ if ($conn && !$conn->connect_error) {
                             <tr>
                                 <th>Date</th>
                                 <th>Property No.</th>
+                                <th>Category</th>
                                 <th>Description</th>
                                 <th>Employee</th>
                                 <th>Receipt/Quantity</th>
@@ -367,6 +382,9 @@ if ($conn && !$conn->connect_error) {
                                     </td>
                                     <td>
                                         <span class="property-no"><?php echo htmlspecialchars($item['property_no']); ?></span>
+                                    </td>
+                                    <td>
+                                        <span class="category-badge"><?php echo htmlspecialchars($item['asset_category']); ?></span>
                                     </td>
                                     <td class="description-cell" title="<?php echo htmlspecialchars($item['description']); ?>">
                                         <?php echo htmlspecialchars($item['description']); ?>
