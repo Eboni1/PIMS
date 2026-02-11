@@ -245,15 +245,17 @@ if (!$conn || $conn->connect_error) {
             LIMIT 5";
         $office_dist_result = $conn->query($office_dist_query);
         $stats['office_distribution'] = [];
+        $total_value_from_offices = 0;
         if ($office_dist_result) {
             while ($row = $office_dist_result->fetch_assoc()) {
                 $stats['office_distribution'][] = $row;
+                $total_value_from_offices += $row['item_value'];
             }
+            // Update total_value to be the sum of all office distribution values
+            $stats['total_value'] = $total_value_from_offices;
         }
 
         // ===== RECENT ACTIVITY =====
-        $check_item_status = $conn->query("SHOW COLUMNS FROM asset_items LIKE 'status'");
-        $item_has_status = $check_item_status && $check_item_status->num_rows > 0;
         $recent_items_query = "SELECT 
             ai.id, ai.description" . ($item_has_status ? ", ai.status" : "") . ", ai.last_updated,
             a.description as asset_description,
@@ -565,6 +567,79 @@ $total_forms_value = $stats['par_value'] + $stats['ics_value'] + $stats['ris_val
                             <script type="application/json" id="officeData">
                             <?php echo json_encode(array_slice($stats['office_distribution'], 0, 5)); ?>
                             </script>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="section-card mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div class="section-title mb-0">
+                            <i class="bi bi-box-seam"></i> Asset Summary
+                        </div>
+                        <a href="asset_items.php" class="view-all">
+                            View All <i class="bi bi-arrow-right"></i>
+                        </a>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-summary-item">
+                                <div class="form-type">
+                                    <div class="form-type-icon par">Total</div>
+                                    <span class="small">Total Asset Items</span>
+                                </div>
+                                <div class="text-end">
+                                    <div class="form-count"><?php echo number_format($stats['total_items']); ?></div>
+                                    <div class="form-value">PHP <?php echo number_format($stats['total_value'], 2); ?></div>
+                                </div>
+                            </div>
+                            <div class="form-summary-item">
+                                <div class="form-type">
+                                    <div class="form-type-icon ics">Serviceable</div>
+                                    <span class="small">Serviceable Items</span>
+                                </div>
+                                <div class="text-end">
+                                    <div class="form-count"><?php echo number_format($stats['serviceable_items']); ?></div>
+                                    <div class="form-value">Active & Available</div>
+                                </div>
+                            </div>
+                            <div class="form-summary-item">
+                                <div class="form-type">
+                                    <div class="form-type-icon ris">Maintenance</div>
+                                    <span class="small">Maintenance Items</span>
+                                </div>
+                                <div class="text-end">
+                                    <div class="form-count"><?php echo number_format($stats['unserviceable_items']); ?></div>
+                                    <div class="form-value">Under Repair</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-summary-item">
+                                <div class="form-type">
+                                    <div class="form-type-icon iirup">Categories</div>
+                                    <span class="small">Asset Categories</span>
+                                </div>
+                                <div class="text-end">
+                                    <div class="form-count"><?php echo count($stats['top_categories']); ?></div>
+                                    <div class="form-value">Active Categories</div>
+                                </div>
+                            </div>
+                            <div class="form-summary-item">
+                                <div class="form-type">
+                                    <div class="form-type-icon itr">Offices</div>
+                                    <span class="small">Office Distribution</span>
+                                </div>
+                                <div class="text-end">
+                                    <div class="form-count"><?php echo $stats['office_count']; ?></div>
+                                    <div class="form-value">Active Offices</div>
+                                </div>
+                            </div>
+                            <div class="form-summary-item" style="background: rgba(25, 27, 169, 0.05); border-radius: 8px; padding: 0.75rem; margin-top: 0.5rem;">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span class="fw-bold">Total Asset Value</span>
+                                    <span class="fw-bold text-primary">PHP <?php echo number_format($stats['total_value'], 2); ?></span>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
