@@ -357,17 +357,21 @@ try {
             <i class="bi bi-people"></i>
             Employees
         </a>
+        <a href="property_card.php" class="sidebar-nav-item <?php echo $current_page == 'property_card.php' ? 'active' : ''; ?>">
+            <i class="bi bi-credit-card"></i>
+            Property Card
+        </a>
         <div class="sidebar-dropdown">
-            <button class="sidebar-dropdown-toggle <?php echo (in_array($current_page, ['par_form.php', 'ics_form.php', 'ris_form.php', 'iirup_form.php', 'itr_form.php', 'property_card.php'])) ? 'active' : ''; ?>" 
+            <button class="sidebar-dropdown-toggle <?php echo (in_array($current_page, ['par_form.php', 'ics_form.php', 'ris_form.php', 'iirup_form.php', 'itr_form.php'])) ? 'active' : ''; ?>" 
                     type="button" data-bs-toggle="collapse" data-bs-target="#formsDropdown" 
-                    aria-expanded="<?php echo (in_array($current_page, ['par_form.php', 'ics_form.php', 'ris_form.php', 'iirup_form.php', 'itr_form.php', 'property_card.php'])) ? 'true' : 'false'; ?>">
+                    aria-expanded="<?php echo (in_array($current_page, ['par_form.php', 'ics_form.php', 'ris_form.php', 'iirup_form.php', 'itr_form.php'])) ? 'true' : 'false'; ?>">
                 <div>
                     <i class="bi bi-file-earmark-text"></i>
                     Forms
                 </div>
                 <i class="bi bi-chevron-down"></i>
             </button>
-            <div class="collapse <?php echo (in_array($current_page, ['par_form.php', 'ics_form.php', 'ris_form.php', 'iirup_form.php', 'itr_form.php', 'property_card.php'])) ? 'show' : ''; ?>" id="formsDropdown">
+            <div class="collapse <?php echo (in_array($current_page, ['par_form.php', 'ics_form.php', 'ris_form.php', 'iirup_form.php', 'itr_form.php'])) ? 'show' : ''; ?>" id="formsDropdown">
                 <ul class="sidebar-dropdown-menu">
                     <li>
                         <a href="par_form.php" class="sidebar-dropdown-item <?php echo $current_page == 'par_form.php' ? 'active' : ''; ?>">
@@ -392,12 +396,6 @@ try {
                     <li>
                         <a href="itr_form.php" class="sidebar-dropdown-item <?php echo $current_page == 'itr_form.php' ? 'active' : ''; ?>">
                             Inventory Transfer Request
-                        </a>
-                    </li>
-                    <li>
-                        <a href="property_card.php" class="sidebar-dropdown-item <?php echo $current_page == 'property_card.php' ? 'active' : ''; ?>">
-                            <i class="bi bi-credit-card"></i>
-                            Property Card
                         </a>
                     </li>
                 </ul>

@@ -358,14 +358,8 @@ if ($conn && !$conn->connect_error) {
                         </thead>
                         <tbody>
                             <?php 
-                            $balance_counter = [];
+                            $item_counter = 1;
                             foreach ($asset_items as $index => $item): 
-                                // Initialize balance counter for each property number
-                                $property_key = $item['property_no'];
-                                if (!isset($balance_counter[$property_key])) {
-                                    $balance_counter[$property_key] = 0;
-                                }
-                                $balance_counter[$property_key]++;
                             ?>
                                 <tr>
                                     <td class="date-cell">
@@ -398,10 +392,12 @@ if ($conn && !$conn->connect_error) {
                                         ₱<?php echo number_format($item['value'], 2); ?>
                                     </td>
                                     <td class="balance-qty">
-                                        <?php echo $balance_counter[$property_key]; ?>
+                                        <?php echo $item_counter; ?>
                                     </td>
-                                </tr>
-                            <?php endforeach; ?>
+                            <?php 
+                                $item_counter++;
+                            endforeach; 
+                            ?>
                         </tbody>
                     </table>
                 </div>
