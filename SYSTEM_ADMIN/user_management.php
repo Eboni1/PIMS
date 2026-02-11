@@ -1034,6 +1034,14 @@ $page_title = 'User Management';
                             </div>
                         </div>
                         <div class="row">
+                            <div class="col-md-12">
+                                <div class="mb-3">
+                                    <label for="office" class="form-label">Office</label>
+                                    <input type="text" class="form-control" id="office" name="office">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
                             <div class="col-md-6">
                                 <div class="mb-3">
                                     <label for="password" class="form-label">Password</label>
