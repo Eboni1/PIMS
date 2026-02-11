@@ -324,8 +324,11 @@ $status_display = formatStatus($item['status']);
                     <a href="asset_items.php?asset_id=<?php echo $asset_id; ?>" class="btn btn-back me-2">
                         <i class="bi bi-arrow-left"></i> Back to Items
                     </a>
-                    <a href="print_inventory_tag.php?id=<?php echo $item_id; ?>" class="btn btn-outline-primary btn-sm" target="_blank">
+                    <a href="print_inventory_tag.php?id=<?php echo $item_id; ?>" class="btn btn-outline-primary btn-sm me-2" target="_blank">
                         <i class="bi bi-printer"></i> Print
+                    </a>
+                    <a href="export_asset_pdf.php?id=<?php echo $item_id; ?>" class="btn btn-danger btn-sm" target="_blank">
+                        <i class="bi bi-file-pdf"></i> Export PDF
                     </a>
                 </div>
             </div>
