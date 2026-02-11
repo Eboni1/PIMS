@@ -22,7 +22,33 @@ if (!in_array($_SESSION['role'], ['admin', 'system_admin'])) {
 // Log property card access
 logSystemAction($_SESSION['user_id'], 'access', 'property_card', 'User accessed Property Card page');
 
-// Get asset items with PAR ID
+// Get available categories for filter
+$categories = [];
+if ($conn && !$conn->connect_error) {
+    $result = $conn->query("SELECT id, category_name, category_code FROM asset_categories WHERE status = 'active' ORDER BY category_name");
+    if ($result) {
+        while ($row = $result->fetch_assoc()) {
+            $categories[] = $row;
+        }
+    }
+}
+
+// Get available offices for filter
+$offices = [];
+if ($conn && !$conn->connect_error) {
+    $result = $conn->query("SELECT id, office_name, office_code FROM offices WHERE status = 'active' ORDER BY office_name");
+    if ($result) {
+        while ($row = $result->fetch_assoc()) {
+            $offices[] = $row;
+        }
+    }
+}
+
+// Get filter parameters
+$selected_category = $_GET['category'] ?? '';
+$selected_office = $_GET['office'] ?? '';
+
+// Get asset items with PAR ID and filters
 $asset_items = [];
 if ($conn && !$conn->connect_error) {
     try {
@@ -44,8 +70,19 @@ if ($conn && !$conn->connect_error) {
                   LEFT JOIN offices o1 ON ai.office_id = o1.id
                   LEFT JOIN employees e ON ai.employee_id = e.id
                   LEFT JOIN offices o2 ON e.office_id = o2.id
-                  WHERE ai.par_id IS NOT NULL AND ai.par_id != ''
-                  ORDER BY ai.created_at ASC";
+                  WHERE ai.par_id IS NOT NULL AND ai.par_id != ''";
+        
+        // Add category filter
+        if (!empty($selected_category)) {
+            $query .= " AND ac.category_code = '" . $conn->real_escape_string($selected_category) . "'";
+        }
+        
+        // Add office filter
+        if (!empty($selected_office)) {
+            $query .= " AND (o1.office_code = '" . $conn->real_escape_string($selected_office) . "' OR o2.office_code = '" . $conn->real_escape_string($selected_office) . "')";
+        }
+        
+        $query .= " ORDER BY ai.created_at ASC";
         
         $result = $conn->query($query);
         if ($result) {
@@ -258,6 +295,39 @@ if ($conn && !$conn->connect_error) {
             text-overflow: initial;
         }
         
+        .filter-section {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border: 1px solid #dee2e6;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .filter-badge {
+            background: rgba(25, 27, 169, 0.1);
+            color: #191BA9;
+            padding: 0.25rem 0.5rem;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+        
+        .filter-row {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border-bottom: 2px solid #dee2e6;
+        }
+        
+        .filter-row th {
+            border-bottom: none;
+            padding: 0.75rem;
+            vertical-align: middle;
+        }
+        
+        .filter-row .form-label {
+            color: #495057;
+            font-size: 0.875rem;
+        }
+        
         .stats-row {
             display: flex;
             gap: 1rem;
@@ -376,6 +446,47 @@ if ($conn && !$conn->connect_error) {
                 <div class="table-responsive">
                     <table class="table table-custom" id="propertyCardTable">
                         <thead>
+                            <tr class="filter-row">
+                                <th colspan="2" class="text-start">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <label for="categoryFilter" class="form-label mb-0 fw-semibold">
+                                            <i class="bi bi-tags me-1"></i>Category
+                                        </label>
+                                        <select class="form-select form-select-sm" style="width: auto;" id="categoryFilter" name="category" onchange="autoFilter()">
+                                            <option value="">All Categories</option>
+                                            <?php foreach ($categories as $category): ?>
+                                                <option value="<?php echo htmlspecialchars($category['category_code']); ?>" 
+                                                        <?php echo $selected_category === $category['category_code'] ? 'selected' : ''; ?>>
+                                                    <?php echo htmlspecialchars($category['category_code']); ?>
+                                                </option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
+                                </th>
+                                <th colspan="2" class="text-start">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <label for="officeFilter" class="form-label mb-0 fw-semibold">
+                                            <i class="bi bi-building me-1"></i>Office
+                                        </label>
+                                        <select class="form-select form-select-sm" style="width: auto;" id="officeFilter" name="office" onchange="autoFilter()">
+                                            <option value="">All Offices</option>
+                                            <?php foreach ($offices as $office): ?>
+                                                <option value="<?php echo htmlspecialchars($office['office_code']); ?>" 
+                                                        <?php echo $selected_office === $office['office_code'] ? 'selected' : ''; ?>>
+                                                    <?php echo htmlspecialchars($office['office_code']); ?>
+                                                </option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
+                                </th>
+                                <th colspan="6" class="text-end">
+                                    <div class="d-flex gap-2 justify-content-end">
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="clearFilters()">
+                                            <i class="bi bi-x-circle me-1"></i>Clear
+                                        </button>
+                                    </div>
+                                </th>
+                            </tr>
                             <tr>
                                 <th>Date</th>
                                 <th>Property No.</th>
@@ -526,6 +637,30 @@ if ($conn && !$conn->connect_error) {
                     };
                 }
             }).trigger();
+        }
+        
+        function autoFilter() {
+            const category = document.getElementById('categoryFilter').value;
+            const office = document.getElementById('officeFilter').value;
+            
+            // Build URL with filter parameters
+            let url = 'property_card.php';
+            const params = new URLSearchParams();
+            
+            if (category) params.append('category', category);
+            if (office) params.append('office', office);
+            
+            if (params.toString()) {
+                url += '?' + params.toString();
+            }
+            
+            // Redirect to filtered page
+            window.location.href = url;
+        }
+        
+        function clearFilters() {
+            // Redirect to page without filters
+            window.location.href = 'property_card.php';
         }
         
         // Auto-refresh every 5 minutes
