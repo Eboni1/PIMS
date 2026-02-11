@@ -999,6 +999,8 @@ $page_title = 'User Management';
     <?php require_once 'includes/logout-modal.php'; ?>
     <?php require_once 'includes/change-password-modal.php'; ?>
     
+<!-- TESTBOI -->
+
     <!-- Add User Modal -->
     <div class="modal fade" id="addUserModal" tabindex="-1">
         <div class="modal-dialog modal-lg">
