@@ -86,7 +86,17 @@ if ($conn && !$conn->connect_error) {
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="../assets/css/index.css" rel="stylesheet">
     <link href="../assets/css/theme-custom.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.1/css/buttons.bootstrap5.min.css">
     <style>
+        :root {
+            --primary-gradient: linear-gradient(135deg, #191BA9 0%, #5CC2F2 100%);
+            --border-radius: 12px;
+            --transition: all 0.3s ease;
+            --shadow: 0 2px 12px rgba(0,0,0,0.08);
+            --shadow-lg: 0 4px 20px rgba(0,0,0,0.15);
+        }
+        
         body {
             font-family: 'Inter', sans-serif;
             background: linear-gradient(135deg, #F7F3F3 0%, #C1EAF2 100%);
@@ -116,8 +126,8 @@ if ($conn && !$conn->connect_error) {
         }
         
         .table-custom thead th {
-            background: linear-gradient(135deg, #191BA9 0%, #5CC2F2 100%);
-            color: white;
+            background: transparent;
+            color: #212529;
             font-weight: 600;
             border: none;
             padding: 1rem 0.75rem;
@@ -293,8 +303,11 @@ if ($conn && !$conn->connect_error) {
                     <p class="text-muted mb-0">View all asset items with Property Acknowledgment Receipt (PAR) references</p>
                 </div>
                 <div class="col-md-4 text-md-end">
-                    <button class="btn export-btn" onclick="exportToCSV()">
+                    <button class="btn export-btn me-2" onclick="exportToCSV()">
                         <i class="bi bi-download me-1"></i> Export to CSV
+                    </button>
+                    <button class="btn btn-danger" onclick="exportToPDF()">
+                        <i class="bi bi-file-pdf me-1"></i> Export to PDF
                     </button>
                 </div>
             </div>
@@ -337,8 +350,7 @@ if ($conn && !$conn->connect_error) {
                                 <th>Property No.</th>
                                 <th>Description</th>
                                 <th>Employee</th>
-                                <th>Receipt</th>
-                                <th>Quantity</th>
+                                <th>Receipt/Quantity</th>
                                 <th>Unit Cost</th>
                                 <th>Total Value</th>
                                 <th>Balance Qty</th>
@@ -375,13 +387,7 @@ if ($conn && !$conn->connect_error) {
                                             <span class="text-muted">Not assigned</span>
                                         <?php endif; ?>
                                     </td>
-                                    <td>
-                                        <?php if ($item['par_no']): ?>
-                                            <span class="par-reference"><?php echo htmlspecialchars($item['par_no']); ?></span>
-                                        <?php else: ?>
-                                            <span class="text-muted">PAR-<?php echo str_pad($item['par_id'], 6, '0', STR_PAD_LEFT); ?></span>
-                                        <?php endif; ?>
-                                    </td>
+                                    
                                     <td>
                                         <span class="quantity-badge">1</span>
                                     </td>
@@ -408,49 +414,83 @@ if ($conn && !$conn->connect_error) {
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="../assets/js/sidebar.js"></script>
+    <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+    <script src="https://cdn.datatables.net/buttons/2.4.1/js/dataTables.buttons.min.js"></script>
+    <script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.bootstrap5.min.js"></script>
+    <script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.html5.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/pdfmake.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/vfs_fonts.js"></script>
+    <script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.print.min.js"></script>
+    <?php require_once 'includes/sidebar-scripts.php'; ?>
     <script>
-        function exportToCSV() {
-            const table = document.getElementById('propertyCardTable');
-            if (!table) return;
-            
-            let csv = [];
-            const rows = table.querySelectorAll('tr');
-            
-            // Add headers
-            const headers = [];
-            table.querySelectorAll('thead th').forEach(th => {
-                headers.push(th.textContent.trim());
-            });
-            csv.push(headers.join(','));
-            
-            // Add data rows
-            table.querySelectorAll('tbody tr').forEach(tr => {
-                const rowData = [];
-                tr.querySelectorAll('td').forEach(td => {
-                    let cellText = td.textContent.trim();
-                    // Remove currency symbols and extra spaces
-                    cellText = cellText.replace(/₱/g, '').replace(/\s+/g, ' ');
-                    // Escape commas in text
-                    if (cellText.includes(',')) {
-                        cellText = `"${cellText}"`;
+        // Initialize DataTable
+        $(document).ready(function() {
+            $('#propertyCardTable').DataTable({
+                responsive: true,
+                pageLength: 25,
+                lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
+                order: [[0, 'desc']], // Sort by date column (first column) descending
+                language: {
+                    search: "Search:",
+                    lengthMenu: "Show _MENU_ entries",
+                    info: "Showing _START_ to _END_ of _TOTAL_ entries",
+                    paginate: {
+                        first: "First",
+                        last: "Last",
+                        next: "Next",
+                        previous: "Previous"
                     }
-                    rowData.push(cellText);
-                });
-                csv.push(rowData.join(','));
+                }
             });
-            
-            // Create and download CSV file
-            const csvContent = csv.join('\n');
-            const blob = new Blob([csvContent], { type: 'text/csv' });
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'property_card_' + new Date().toISOString().split('T')[0] + '.csv';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            window.URL.revokeObjectURL(url);
+        });
+        
+        function exportToCSV() {
+            // Trigger DataTables CSV export
+            $('#propertyCardTable').DataTable().button().add(0, {
+                extend: 'csv',
+                text: '<i class="bi bi-download me-1"></i> Export to CSV',
+                className: 'btn export-btn',
+                filename: function() {
+                    return 'property_card_' + new Date().toISOString().split('T')[0];
+                }
+            }).trigger();
+        }
+        
+        function exportToPDF() {
+            // Trigger DataTables PDF export
+            $('#propertyCardTable').DataTable().button().add(0, {
+                extend: 'pdf',
+                text: '<i class="bi bi-file-pdf me-1"></i> Export to PDF',
+                className: 'btn btn-danger',
+                filename: function() {
+                    return 'property_card_' + new Date().toISOString().split('T')[0];
+                },
+                title: 'Property Card Report',
+                orientation: 'landscape',
+                pageSize: 'A4',
+                exportOptions: {
+                    columns: ':visible'
+                },
+                customize: function(doc) {
+                    // Add custom styling to PDF
+                    doc.styles.title = {
+                        fontSize: 18,
+                        bold: true,
+                        alignment: 'center'
+                    };
+                    doc.styles.tableHeader = {
+                        fillColor: '#191BA9',
+                        color: 'white',
+                        alignment: 'center'
+                    };
+                    doc.defaultStyle = {
+                        fontSize: 10,
+                        alignment: 'left'
+                    };
+                }
+            }).trigger();
         }
         
         // Auto-refresh every 5 minutes
