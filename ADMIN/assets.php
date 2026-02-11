@@ -581,7 +581,6 @@ try {
                             <th>Category</th>
                             <th>Description</th>
                             <th>Quantity</th>
-                            <th>Status</th>
                             <th>Office</th>
                             <th>Created</th>
                             <th>Actions</th>
@@ -600,39 +599,6 @@ try {
                                     </td>
                                     <td><?php echo htmlspecialchars($asset['description']); ?></td>
                                     <td><?php echo $asset['quantity']; ?></td>
-                                    <td>
-                                        <?php
-                                        // Use the pre-calculated most common status
-                                        $status = $asset['most_common_status'] ?? 'unknown';
-                                        $status_class = '';
-                                        $status_icon = '';
-                                        
-                                        switch($status) {
-                                            case 'no_tag':
-                                                $status_class = 'bg-danger';
-                                                $status_icon = 'bi-exclamation-triangle';
-                                                break;
-                                            case 'serviceable':
-                                                $status_class = 'bg-success';
-                                                $status_icon = 'bi-check-circle';
-                                                break;
-                                            case 'unserviceable':
-                                                $status_class = 'bg-danger';
-                                                $status_icon = 'bi-x-circle';
-                                                break;
-                                            case 'red_tagged':
-                                                $status_class = 'bg-danger';
-                                                $status_icon = 'bi-flag';
-                                                break;
-                                            default:
-                                                $status_class = 'bg-secondary';
-                                                $status_icon = 'bi-question-circle';
-                                        }
-                                        ?>
-                                        <span class="badge <?php echo $status_class; ?>">
-                                            <i class="bi <?php echo $status_icon; ?>"></i> <?php echo ucfirst(str_replace('_', ' ', $status)); ?>
-                                        </span>
-                                    </td>
                                     <td><?php echo htmlspecialchars($asset['office_name'] ?? 'N/A'); ?></td>
                                     <td><small><?php echo date('M j, Y', strtotime($asset['created_at'])); ?></small></td>
                                     <td>

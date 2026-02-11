@@ -141,11 +141,31 @@ $notag_items = count(array_filter($items, function($item) { return $item['status
             font-weight: 600;
         }
         
-        .status-serviceable { background-color: #d4edda; color: #155724; }
-        .status-unserviceable { background-color: #cce5ff; color: #004085; }
-        .status-red-tagged { background-color: #f8d7da; color: #721c24; }
-        .status-borrowed { background-color: #fff3cd; color: #856404; }
-        .status-notag { background-color: #e2e3e5; color: #383d41; }
+        .status-serviceable { 
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%); 
+            color: white; 
+            border: 1px solid #20c997;
+        }
+        .status-unserviceable { 
+            background: linear-gradient(135deg, #007bff 0%, #0056b3 100%); 
+            color: white;
+            border: 1px solid #0056b3;
+        }
+        .status-red-tagged { 
+            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); 
+            color: white;
+            border: 1px solid #c82333;
+        }
+        .status-borrowed { 
+            background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%); 
+            color: #212529;
+            border: 1px solid #e0a800;
+        }
+        .status-notag { 
+            background: linear-gradient(135deg, #6c757d 0%, #545b62 100%); 
+            color: white;
+            border: 1px solid #545b62;
+        }
         
         .text-value {
             font-weight: 600;
@@ -309,19 +329,19 @@ $notag_items = count(array_filter($items, function($item) { return $item['status
                                         <?php
                                         $status_class = '';
                                         switch($item['status']) {
-                                            case 'available':
+                                            case 'serviceable':
                                                 $status_class = 'status-serviceable';
                                                 $display_status = 'Serviceable';
                                                 break;
-                                            case 'in_use':
+                                            case 'unserviceable':
                                                 $status_class = 'status-unserviceable';
                                                 $display_status = 'Unserviceable';
                                                 break;
-                                            case 'maintenance':
+                                            case 'red_tagged':
                                                 $status_class = 'status-red-tagged';
                                                 $display_status = 'Red-Tagged';
                                                 break;
-                                            case 'disposed':
+                                            case 'borrowed':
                                                 $status_class = 'status-borrowed';
                                                 $display_status = 'Borrowed';
                                                 break;
