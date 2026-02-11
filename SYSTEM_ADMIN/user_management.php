@@ -261,9 +261,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $role = $_POST['role'];
     $first_name = trim($_POST['first_name']);
     $last_name = trim($_POST['last_name']);
+    $office_id = isset($_POST['office']) ? $_POST['office'] : null;
     
     // Validation
-    if (empty($email) || empty($password) || empty($first_name) || empty($last_name)) {
+    if (empty($email) || empty($password) || empty($first_name) || empty($last_name) || empty($office_id)) {
         $message = 'All fields are required';
         $message_type = 'danger';
     } else {
@@ -280,12 +281,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             } else {
                 // Insert new user
                 $password_hash = password_hash($password, PASSWORD_DEFAULT);
-                $stmt = $conn->prepare("INSERT INTO users (username, email, password_hash, role, first_name, last_name) VALUES (?, ?, ?, ?, ?, ?)");
-                $stmt->bind_param("ssssss", $username, $email, $password_hash, $role, $first_name, $last_name);
+                $stmt = $conn->prepare("INSERT INTO users (username, email, password_hash, role, first_name, last_name, office_id) VALUES (?, ?, ?, ?, ?, ?, ?)");
+                $stmt->bind_param("ssssssi", $username, $email, $password_hash, $role, $first_name, $last_name, $office_id);
                 
                 if ($stmt->execute()) {
                     // Log user creation
-                    logSystemAction($_SESSION['user_id'], 'create_user', 'users', "Created user: {$first_name} {$last_name} ({$email}) with role: {$role}");
+                    logSystemAction($_SESSION['user_id'], 'create_user', 'users', "Created user: {$first_name} {$last_name} ({$email}) with role: {$role}, office_id: {$office_id}");
                     
                     // Send welcome email with credentials
                     $email_sent = sendWelcomeEmail($email, $first_name, $last_name, $username, $password);
@@ -999,8 +1000,6 @@ $page_title = 'User Management';
     <?php require_once 'includes/logout-modal.php'; ?>
     <?php require_once 'includes/change-password-modal.php'; ?>
     
-<!-- TESTBOI testest -->
-
     <!-- Add User Modal -->
     <div class="modal fade" id="addUserModal" tabindex="-1">
         <div class="modal-dialog modal-lg">
@@ -1036,14 +1035,6 @@ $page_title = 'User Management';
                             </div>
                         </div>
                         <div class="row">
-                            <div class="col-md-12">
-                                <div class="mb-3">
-                                    <label for="office" class="form-label">Office</label>
-                                    <input type="text" class="form-control" id="office" name="office">
-                                </div>
-                            </div>
-                        </div>
-                        <div class="row">
                             <div class="col-md-6">
                                 <div class="mb-3">
                                     <label for="password" class="form-label">Password</label>
@@ -1060,6 +1051,30 @@ $page_title = 'User Management';
                                         <option value="admin">Admin</option>
                                         <option value="office_admin">Office Admin</option>
                                         <option value="user">User</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-12">
+                                <div class="mb-3">
+                                    <label for="office" class="form-label">Office</label>
+                                    <select class="form-control" id="office" name="office" required>
+                                        <option value="">Select Office</option>
+                                        <?php
+                                        try {
+                                            $office_stmt = $conn->prepare("SELECT id, office_name, office_code FROM offices WHERE status = 'active' ORDER BY office_name");
+                                            $office_stmt->execute();
+                                            $office_result = $office_stmt->get_result();
+                                            
+                                            while ($office = $office_result->fetch_assoc()) {
+                                                echo "<option value='" . $office['id'] . "'>" . htmlspecialchars($office['office_name']) . " (" . htmlspecialchars($office['office_code']) . ")</option>";
+                                            }
+                                            $office_stmt->close();
+                                        } catch (Exception $e) {
+                                            echo "<option value=''>Error loading offices</option>";
+                                        }
+                                        ?>
                                     </select>
                                 </div>
                             </div>
