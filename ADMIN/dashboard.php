@@ -245,15 +245,17 @@ if (!$conn || $conn->connect_error) {
             LIMIT 5";
         $office_dist_result = $conn->query($office_dist_query);
         $stats['office_distribution'] = [];
+        $total_value_from_offices = 0;
         if ($office_dist_result) {
             while ($row = $office_dist_result->fetch_assoc()) {
                 $stats['office_distribution'][] = $row;
+                $total_value_from_offices += $row['item_value'];
             }
+            // Update total_value to be the sum of all office distribution values
+            $stats['total_value'] = $total_value_from_offices;
         }
 
         // ===== RECENT ACTIVITY =====
-        $check_item_status = $conn->query("SHOW COLUMNS FROM asset_items LIKE 'status'");
-        $item_has_status = $check_item_status && $check_item_status->num_rows > 0;
         $recent_items_query = "SELECT 
             ai.id, ai.description" . ($item_has_status ? ", ai.status" : "") . ", ai.last_updated,
             a.description as asset_description,
@@ -385,363 +387,15 @@ $total_forms_value = $stats['par_value'] + $stats['ics_value'] + $stats['ris_val
     <title>Admin Dashboard - PIMS</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.3/font/bootstrap-icons.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <script>
+        // Verify Chart.js loaded
+        console.log('Chart.js version:', typeof Chart !== 'undefined' ? Chart.version : 'Not loaded');
+    </script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="../assets/css/index.css" rel="stylesheet">
     <link href="../assets/css/theme-custom.css" rel="stylesheet">
-    <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            background: linear-gradient(135deg, #F7F3F3 0%, #C1EAF2 100%);
-            min-height: 100vh;
-            overflow-x: hidden;
-        }
-        
-        .dashboard-header {
-            background: white;
-            border-radius: 16px;
-            padding: 1.5rem 2rem;
-            margin-bottom: 1.5rem;
-            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
-            border-left: 4px solid #191BA9;
-        }
-        
-        .module-card {
-            background: white;
-            border-radius: 16px;
-            padding: 1.25rem;
-            text-align: center;
-            transition: all 0.3s ease;
-            border: 1px solid rgba(0,0,0,0.05);
-            cursor: pointer;
-            text-decoration: none;
-            color: inherit;
-            display: block;
-            height: 100%;
-        }
-        
-        .module-card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 12px 24px rgba(25, 27, 169, 0.15);
-            border-color: #191BA9;
-            color: inherit;
-        }
-        
-        .module-icon {
-            width: 56px;
-            height: 56px;
-            border-radius: 14px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto 0.75rem;
-            font-size: 1.5rem;
-        }
-        
-        .module-icon.blue { background: linear-gradient(135deg, #191BA9 0%, #5CC2F2 100%); color: white; }
-        .module-icon.green { background: linear-gradient(135deg, #28a745 0%, #20c997 100%); color: white; }
-        .module-icon.orange { background: linear-gradient(135deg, #fd7e14 0%, #ffc107 100%); color: white; }
-        .module-icon.purple { background: linear-gradient(135deg, #6f42c1 0%, #e83e8c 100%); color: white; }
-        .module-icon.red { background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); color: white; }
-        .module-icon.teal { background: linear-gradient(135deg, #20c997 0%, #17a2b8 100%); color: white; }
-        
-        .module-title {
-            font-weight: 600;
-            font-size: 0.9rem;
-            margin-bottom: 0.25rem;
-        }
-        
-        .module-desc {
-            font-size: 0.75rem;
-            color: #6c757d;
-        }
-        
-        .stat-card {
-            background: white;
-            border-radius: 16px;
-            padding: 1.25rem;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-            border: 1px solid rgba(0,0,0,0.04);
-            height: 100%;
-            transition: all 0.3s ease;
-        }
-        
-        .stat-card:hover {
-            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
-        }
-        
-        .stat-icon {
-            width: 48px;
-            height: 48px;
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.25rem;
-            margin-bottom: 0.75rem;
-        }
-        
-        .stat-icon.blue { background: rgba(25, 27, 169, 0.1); color: #191BA9; }
-        .stat-icon.green { background: rgba(40, 167, 69, 0.1); color: #28a745; }
-        .stat-icon.orange { background: rgba(253, 126, 20, 0.1); color: #fd7e14; }
-        .stat-icon.purple { background: rgba(111, 66, 193, 0.1); color: #6f42c1; }
-        .stat-icon.red { background: rgba(220, 53, 69, 0.1); color: #dc3545; }
-        .stat-icon.cyan { background: rgba(23, 162, 184, 0.1); color: #17a2b8; }
-        
-        .stat-value {
-            font-size: 1.75rem;
-            font-weight: 700;
-            color: #212529;
-            margin-bottom: 0.25rem;
-        }
-        
-        .stat-label {
-            font-size: 0.8rem;
-            color: #6c757d;
-            font-weight: 500;
-        }
-        
-        .stat-sublabel {
-            font-size: 0.7rem;
-            color: #adb5bd;
-            margin-top: 0.25rem;
-        }
-        
-        .section-card {
-            background: white;
-            border-radius: 16px;
-            padding: 1.25rem;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-            border: 1px solid rgba(0,0,0,0.04);
-            margin-bottom: 1.25rem;
-        }
-        
-        .section-title {
-            font-size: 1rem;
-            font-weight: 600;
-            color: #212529;
-            margin-bottom: 1rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-        
-        .section-title i {
-            color: #191BA9;
-        }
-        
-        .chart-container {
-            position: relative;
-            height: 220px;
-        }
-        
-        .activity-item {
-            display: flex;
-            align-items: flex-start;
-            gap: 0.75rem;
-            padding: 0.75rem 0;
-            border-bottom: 1px solid rgba(0,0,0,0.05);
-        }
-        
-        .activity-item:last-child {
-            border-bottom: none;
-            padding-bottom: 0;
-        }
-        
-        .activity-icon {
-            width: 36px;
-            height: 36px;
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.875rem;
-            flex-shrink: 0;
-        }
-        
-        .activity-content {
-            flex: 1;
-            min-width: 0;
-        }
-        
-        .activity-title {
-            font-size: 0.85rem;
-            font-weight: 500;
-            color: #212529;
-            margin-bottom: 0.15rem;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        
-        .activity-meta {
-            font-size: 0.75rem;
-            color: #6c757d;
-        }
-        
-        .activity-time {
-            font-size: 0.7rem;
-            color: #adb5bd;
-            white-space: nowrap;
-        }
-        
-        .status-badge {
-            font-size: 0.7rem;
-            padding: 0.2rem 0.5rem;
-            border-radius: 20px;
-            font-weight: 500;
-        }
-        
-        .status-serviceable { background: rgba(40, 167, 69, 0.1); color: #28a745; }
-        .status-in_use { background: rgba(25, 27, 169, 0.1); color: #191BA9; }
-        .status-maintenance { background: rgba(253, 126, 20, 0.1); color: #fd7e14; }
-        .status-disposed { background: rgba(220, 53, 69, 0.1); color: #dc3545; }
-        .status-unserviceable { background: rgba(108, 117, 125, 0.1); color: #6c757d; }
-        
-        .alert-item {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            padding: 0.75rem;
-            background: rgba(255, 193, 7, 0.08);
-            border-radius: 10px;
-            margin-bottom: 0.5rem;
-            border-left: 3px solid #ffc107;
-        }
-        
-        .alert-item:last-child {
-            margin-bottom: 0;
-        }
-        
-        .alert-icon {
-            width: 32px;
-            height: 32px;
-            background: rgba(255, 193, 7, 0.15);
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #ffc107;
-            font-size: 0.875rem;
-        }
-        
-        .alert-content {
-            flex: 1;
-        }
-        
-        .alert-title {
-            font-size: 0.8rem;
-            font-weight: 500;
-            color: #212529;
-        }
-        
-        .alert-desc {
-            font-size: 0.7rem;
-            color: #6c757d;
-        }
-        
-        .alert-value {
-            font-size: 0.85rem;
-            font-weight: 600;
-            color: #dc3545;
-        }
-        
-        .form-summary-item {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0.5rem 0;
-            border-bottom: 1px solid rgba(0,0,0,0.05);
-        }
-        
-        .form-summary-item:last-child {
-            border-bottom: none;
-        }
-        
-        .form-type {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-        
-        .form-type-icon {
-            width: 28px;
-            height: 28px;
-            border-radius: 6px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.75rem;
-            font-weight: 600;
-        }
-        
-        .form-type-icon.par { background: rgba(25, 27, 169, 0.1); color: #191BA9; }
-        .form-type-icon.ics { background: rgba(40, 167, 69, 0.1); color: #28a745; }
-        .form-type-icon.ris { background: rgba(253, 126, 20, 0.1); color: #fd7e14; }
-        .form-type-icon.iirup { background: rgba(111, 66, 193, 0.1); color: #6f42c1; }
-        .form-type-icon.itr { background: rgba(23, 162, 184, 0.1); color: #17a2b8; }
-        
-        .form-count {
-            font-weight: 600;
-            color: #212529;
-        }
-        
-        .form-value {
-            font-size: 0.75rem;
-            color: #6c757d;
-        }
-        
-        .category-item {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0.6rem 0;
-            border-bottom: 1px solid rgba(0,0,0,0.05);
-        }
-        
-        .category-item:last-child {
-            border-bottom: none;
-        }
-        
-        .category-info {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-        
-        .category-code {
-            font-size: 0.7rem;
-            padding: 0.15rem 0.4rem;
-            background: #191BA9;
-            color: white;
-            border-radius: 4px;
-            font-weight: 500;
-        }
-        
-        .category-name {
-            font-size: 0.8rem;
-            color: #212529;
-        }
-        
-        .category-count {
-            font-size: 0.75rem;
-            color: #6c757d;
-        }
-        
-        .view-all {
-            font-size: 0.8rem;
-            color: #191BA9;
-            text-decoration: none;
-            font-weight: 500;
-            display: flex;
-            align-items: center;
-            gap: 0.25rem;
-        }
-        
-        .view-all:hover {
-            text-decoration: underline;
-        }
-    </style>
+    <link href="dashboard.css" rel="stylesheet">
 </head>
 <body>
     <?php $page_title = 'Admin Dashboard'; ?>
@@ -908,6 +562,83 @@ $total_forms_value = $stats['par_value'] + $stats['ics_value'] + $stats['ris_val
                             </div>
                             <div class="chart-container">
                                 <canvas id="officeChart"></canvas>
+                            </div>
+                            <!-- Office data for JavaScript -->
+                            <script type="application/json" id="officeData">
+                            <?php echo json_encode(array_slice($stats['office_distribution'], 0, 5)); ?>
+                            </script>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="section-card mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div class="section-title mb-0">
+                            <i class="bi bi-box-seam"></i> Asset Summary
+                        </div>
+                        <a href="asset_items.php" class="view-all">
+                            View All <i class="bi bi-arrow-right"></i>
+                        </a>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-summary-item">
+                                <div class="form-type">
+                                    <div class="form-type-icon par">Total</div>
+                                    <span class="small">Total Asset Items</span>
+                                </div>
+                                <div class="text-end">
+                                    <div class="form-count"><?php echo number_format($stats['total_items']); ?></div>
+                                    <div class="form-value">PHP <?php echo number_format($stats['total_value'], 2); ?></div>
+                                </div>
+                            </div>
+                            <div class="form-summary-item">
+                                <div class="form-type">
+                                    <div class="form-type-icon ics">Serviceable</div>
+                                    <span class="small">Serviceable Items</span>
+                                </div>
+                                <div class="text-end">
+                                    <div class="form-count"><?php echo number_format($stats['serviceable_items']); ?></div>
+                                    <div class="form-value">Active & Available</div>
+                                </div>
+                            </div>
+                            <div class="form-summary-item">
+                                <div class="form-type">
+                                    <div class="form-type-icon ris">Maintenance</div>
+                                    <span class="small">Maintenance Items</span>
+                                </div>
+                                <div class="text-end">
+                                    <div class="form-count"><?php echo number_format($stats['unserviceable_items']); ?></div>
+                                    <div class="form-value">Under Repair</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-summary-item">
+                                <div class="form-type">
+                                    <div class="form-type-icon iirup">Categories</div>
+                                    <span class="small">Asset Categories</span>
+                                </div>
+                                <div class="text-end">
+                                    <div class="form-count"><?php echo count($stats['top_categories']); ?></div>
+                                    <div class="form-value">Active Categories</div>
+                                </div>
+                            </div>
+                            <div class="form-summary-item">
+                                <div class="form-type">
+                                    <div class="form-type-icon itr">Offices</div>
+                                    <span class="small">Office Distribution</span>
+                                </div>
+                                <div class="text-end">
+                                    <div class="form-count"><?php echo $stats['office_count']; ?></div>
+                                    <div class="form-value">Active Offices</div>
+                                </div>
+                            </div>
+                            <div class="form-summary-item" style="background: rgba(25, 27, 169, 0.05); border-radius: 8px; padding: 0.75rem; margin-top: 0.5rem;">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span class="fw-bold">Total Asset Value</span>
+                                    <span class="fw-bold text-primary">PHP <?php echo number_format($stats['total_value'], 2); ?></span>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1201,151 +932,6 @@ $total_forms_value = $stats['par_value'] + $stats['ics_value'] + $stats['ris_val
     
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <?php require_once 'includes/sidebar-scripts.php'; ?>
-    <script>
-        function refreshDashboard() {
-            location.reload();
-        }
-        
-        function exportData() {
-            const data = {
-                timestamp: new Date().toISOString(),
-                assets: {
-                    total_items: <?php echo $stats['total_items']; ?>,
-                    serviceable: <?php echo $stats['serviceable_items']; ?>,
-                    in_use: <?php echo $stats['in_use_items']; ?>,
-                    maintenance: <?php echo $stats['maintenance_items']; ?>,
-                    value: <?php echo $stats['total_value']; ?>
-                },
-                forms: {
-                    total: <?php echo $total_forms; ?>,
-                    value: <?php echo $total_forms_value; ?>,
-                    par: <?php echo $stats['par_count']; ?>,
-                    ics: <?php echo $stats['ics_count']; ?>,
-                    ris: <?php echo $stats['ris_count']; ?>,
-                    iirup: <?php echo $stats['iirup_count']; ?>,
-                    itr: <?php echo $stats['itr_count']; ?>
-                },
-                fuel: {
-                    stock: <?php echo $stats['total_fuel_stock']; ?>,
-                    today_transactions: <?php echo $stats['today_transactions']; ?>
-                }
-            };
-            
-            let csv = 'Category,Metric,Value\n';
-            csv += `Assets,Total Items,${data.assets.total_items}\n`;
-            csv += `Assets,Serviceable,${data.assets.serviceable}\n`;
-            csv += `Assets,In Use,${data.assets.in_use}\n`;
-            csv += `Assets,Value,${data.assets.value}\n`;
-            csv += `Forms,Total Count,${data.forms.total}\n`;
-            csv += `Forms,Total Value,${data.forms.value}\n`;
-            csv += `Fuel,Stock (L),${data.fuel.stock}\n`;
-            csv += `Fuel,Today's Transactions,${data.fuel.today_transactions}\n`;
-            
-            const blob = new Blob([csv], { type: 'text/csv' });
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `dashboard_export_${new Date().toISOString().split('T')[0]}.csv`;
-            a.click();
-            window.URL.revokeObjectURL(url);
-        }
-        
-        document.addEventListener('DOMContentLoaded', function() {
-            Chart.defaults.font.family = 'Inter, sans-serif';
-            Chart.defaults.color = '#666';
-            
-            const assetStatusCtx = document.getElementById('assetStatusChart').getContext('2d');
-            new Chart(assetStatusCtx, {
-                type: 'doughnut',
-                data: {
-                    labels: ['Serviceable', 'Unserviceable'],
-                    datasets: [{
-                        data: [
-                            <?php echo $stats['serviceable_items']; ?>,
-                            <?php echo $stats['unserviceable_items']; ?>
-                        ],
-                        backgroundColor: [
-                            '#28a745',
-                            '#dc3545'
-                        ],
-                        borderWidth: 0,
-                        hoverOffset: 4
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    cutout: '70%',
-                    plugins: {
-                        legend: {
-                            display: false
-                        },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    const label = context.label || '';
-                                    const value = context.parsed || 0;
-                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                                    const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
-                                    return `${label}: ${value} (${percentage}%)`;
-                                }
-                            }
-                        }
-                    }
-                }
-            });
-            
-            const officeCtx = document.getElementById('officeChart').getContext('2d');
-            const officeData = <?php echo json_encode(array_slice($stats['office_distribution'], 0, 5)); ?>;
-            new Chart(officeCtx, {
-                type: 'bar',
-                data: {
-                    labels: officeData.map(o => o.office_name.substring(0, 15)),
-                    datasets: [{
-                        label: 'Item Value',
-                        data: officeData.map(o => o.item_value),
-                        backgroundColor: '#5CC2F2',
-                        borderRadius: 4,
-                        barThickness: 20
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: false
-                        }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            grid: {
-                                color: 'rgba(0,0,0,0.05)'
-                            },
-                            ticks: {
-                                callback: function(value) {
-                                    return 'PHP ' + (value / 1000000).toFixed(1) + 'M';
-                                },
-                                font: {
-                                    size: 10
-                                }
-                            }
-                        },
-                        x: {
-                            grid: {
-                                display: false
-                            },
-                            ticks: {
-                                font: {
-                                    size: 10
-                                }
-                            }
-                        }
-                    }
-                }
-            });
-        });
-    </script>
+    <script src="dashboard.js"></script>
 </body>
 </html>
