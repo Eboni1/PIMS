@@ -604,12 +604,12 @@ $total_forms_value = $stats['par_value'] + $stats['ics_value'] + $stats['ris_val
                             </div>
                             <div class="form-summary-item">
                                 <div class="form-type">
-                                    <div class="form-type-icon ris">Maintenance</div>
-                                    <span class="small">Maintenance Items</span>
+                                    <div class="form-type-icon ris">Unserviceable</div>
+                                    <span class="small">Unserviceable Items</span>
                                 </div>
                                 <div class="text-end">
                                     <div class="form-count"><?php echo number_format($stats['unserviceable_items']); ?></div>
-                                    <div class="form-value">Under Repair</div>
+                                    <div class="form-value">Not Serviceable</div>
                                 </div>
                             </div>
                         </div>
