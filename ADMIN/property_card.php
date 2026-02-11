@@ -35,9 +35,15 @@ if ($conn && !$conn->connect_error) {
                     ai.value,
                     ai.par_id,
                     ai.employee_id,
-                    COALESCE(ac.category_code, 'UNCAT') as asset_category
+                    ai.office_id,
+                    COALESCE(ac.category_code, 'UNCAT') as asset_category,
+                    COALESCE(o1.office_name, o2.office_name, 'Unassigned') as office_name,
+                    COALESCE(o1.office_code, o2.office_code, 'NONE') as office_code
                   FROM asset_items ai
                   LEFT JOIN asset_categories ac ON ai.category_id = ac.id
+                  LEFT JOIN offices o1 ON ai.office_id = o1.id
+                  LEFT JOIN employees e ON ai.employee_id = e.id
+                  LEFT JOIN offices o2 ON e.office_id = o2.id
                   WHERE ai.par_id IS NOT NULL AND ai.par_id != ''
                   ORDER BY ai.created_at ASC";
         
@@ -177,6 +183,17 @@ if ($conn && !$conn->connect_error) {
             display: flex;
             flex-direction: column;
             gap: 0.25rem;
+        }
+        
+        .office-code-only {
+            background: rgba(25, 27, 169, 0.1);
+            color: #191BA9;
+            padding: 0.25rem 0.5rem;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            font-family: 'Courier New', monospace;
+            display: inline-block;
         }
         
         .employee-name {
@@ -364,6 +381,7 @@ if ($conn && !$conn->connect_error) {
                                 <th>Property No.</th>
                                 <th>Category</th>
                                 <th>Description</th>
+                                <th>Office</th>
                                 <th>Employee</th>
                                 <th>Receipt/Quantity</th>
                                 <th>Unit Cost</th>
@@ -388,6 +406,9 @@ if ($conn && !$conn->connect_error) {
                                     </td>
                                     <td class="description-cell" title="<?php echo htmlspecialchars($item['description']); ?>">
                                         <?php echo htmlspecialchars($item['description']); ?>
+                                    </td>
+                                    <td>
+                                        <span class="office-code-only"><?php echo htmlspecialchars($item['office_code']); ?></span>
                                     </td>
                                     <td>
                                         <?php if ($item['employee_name']): ?>
