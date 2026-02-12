@@ -21,18 +21,20 @@ if (!in_array($_SESSION['role'], ['admin', 'system_admin'])) {
 
 logSystemAction($_SESSION['user_id'], 'Accessed Inventory Custodian Slip Form', 'forms', 'ics_form.php');
 
-// Get next ICS number
-$next_ics_no = getNextTagPreview('ics_no');
-if ($next_ics_no === null) {
-    $next_ics_no = ''; // Fallback if no configuration exists
-}
+// Get next ICS number - COMMENTED OUT FOR MANUAL INPUT
+// $next_ics_no = getNextTagPreview('ics_no');
+// if ($next_ics_no === null) {
+//     $next_ics_no = ''; // Fallback if no configuration exists
+// }
+$next_ics_no = ''; // Empty for manual input
 
-// Get ICS configuration for JavaScript
-$ics_config = null;
-$result = $conn->query("SELECT * FROM tag_formats WHERE tag_type = 'ics_no' AND status = 'active'");
-if ($result && $row = $result->fetch_assoc()) {
-    $ics_config = $row;
-}
+// Get ICS configuration for JavaScript - COMMENTED OUT FOR MANUAL INPUT
+// $ics_config = null;
+// $result = $conn->query("SELECT * FROM tag_formats WHERE tag_type = 'ics_no' AND status = 'active'");
+// if ($result && $row = $result->fetch_assoc()) {
+//     $ics_config = $row;
+// }
+$ics_config = null; // Disabled for manual input
 
 // Get header image from forms table
 $header_image = '';
@@ -259,8 +261,8 @@ if ($result && $row = $result->fetch_assoc()) {
                                 </div>
                                 <div class="col-md-4">
                                     <label class="form-label"><strong>ICS No:</strong></label>
-                                    <input type="text" class="form-control bg-light" name="ics_no" id="ics_no" value="<?php echo htmlspecialchars($next_ics_no); ?>" readonly>
-                                    <small class="text-muted">Auto-generated next number from system configuration.</small>
+                                    <input type="text" class="form-control" name="ics_no" id="ics_no" value="" placeholder="Enter ICS number manually">
+                                    <small class="text-muted">Enter ICS number manually.</small>
                                 </div>
                             </div>
                             
@@ -304,7 +306,7 @@ if ($result && $row = $result->fetch_assoc()) {
                                                 <td><input type="number" step="0.01" class="form-control form-control-sm" name="unit_cost[]" required onchange="calculateTotal(this)" max="50000" min="0.01"></td>
                                                 <td><input type="number" step="0.01" class="form-control form-control-sm" name="total_cost[]" readonly></td>
                                                 <td><input type="text" class="form-control form-control-sm" name="description[]" required></td>
-                                                <td><input type="text" class="form-control form-control-sm bg-light" name="item_no[]" value="1" readonly></td>
+                                                <td><input type="text" class="form-control form-control-sm" name="item_no[]" value="" placeholder="Enter item number manually"></td>
                                                 <td><input type="text" class="form-control form-control-sm" name="useful_life[]" required></td>
                                                 <td><button type="button" class="btn btn-sm btn-danger" onclick="removeICSRow(this)"><i class="bi bi-trash"></i></button></td>
                                             </tr>
@@ -376,7 +378,7 @@ if ($result && $row = $result->fetch_assoc()) {
                 '<input type="number" step="0.01" class="form-control form-control-sm" name="unit_cost[]" required onchange="calculateTotal(this)" max="50000" min="0.01">',
                 '<input type="number" step="0.01" class="form-control form-control-sm" name="total_cost[]" readonly>',
                 '<input type="text" class="form-control form-control-sm" name="description[]" required>',
-                '<input type="text" class="form-control form-control-sm bg-light" name="item_no[]" value="' + nextItemNumber + '" readonly>',
+                '<input type="text" class="form-control form-control-sm" name="item_no[]" value="" placeholder="Enter item number manually">',
                 '<input type="text" class="form-control form-control-sm" name="useful_life[]" required>',
                 '<button type="button" class="btn btn-sm btn-danger" onclick="removeICSRow(this)"><i class="bi bi-trash"></i></button>'
             ];
@@ -393,8 +395,7 @@ if ($result && $row = $result->fetch_assoc()) {
             
             if (table.rows.length > 1) {
                 row.remove();
-                // Renumber items after removal
-                renumberItems();
+                // No renumbering needed since item numbers are now manual
             } else {
                 alert('At least one row is required');
             }
@@ -438,72 +439,78 @@ if ($result && $row = $result->fetch_assoc()) {
                 while (table.rows.length > 1) {
                     table.deleteRow(1);
                 }
-                // Reset the first row item number to 1
+                // Clear first row item number since it's now manual input
                 const firstRow = table.rows[0];
                 const itemNoInput = firstRow.cells[5].querySelector('input[name="item_no[]"]');
                 if (itemNoInput) {
-                    itemNoInput.value = '1';
+                    itemNoInput.value = '';
                 }
             }
         }
         
         function createNewICS() {
             document.getElementById('icsForm').reset();
-            // Generate fresh ICS number
-            generateNewIcsNumber();
+            // Generate fresh ICS number - COMMENTED OUT
+            // generateNewIcsNumber();
             // Reset item numbering
             const table = document.getElementById('icsItemsTable').getElementsByTagName('tbody')[0];
             while (table.rows.length > 1) {
                 table.deleteRow(1);
             }
-            // Reset the first row item number to 1
+            // Clear first row item number since it's now manual input
             const firstRow = table.rows[0];
             const itemNoInput = firstRow.cells[5].querySelector('input[name="item_no[]"]');
             if (itemNoInput) {
-                itemNoInput.value = '1';
+                itemNoInput.value = '';
             }
         }
         
-        // Generate new ICS number via AJAX
+        // Generate new ICS number via AJAX - COMMENTED OUT FOR MANUAL INPUT
         function generateNewIcsNumber() {
-            <?php if ($ics_config): ?>
-            const components = <?php 
-                $components = json_decode($ics_config['format_components'], true);
-                if (is_string($components)) {
-                    $components = json_decode($components, true);
-                }
-                echo json_encode($components ?: []);
-            ?>;
-            const digits = <?php echo $ics_config['digits']; ?>;
-            const separator = '<?php echo $ics_config['separator']; ?>';
+            // COMMENTED OUT - Auto-generation disabled
+            // <?php if ($ics_config): ?>
+            // const components = <?php 
+            //     $components = json_decode($ics_config['format_components'], true);
+            //     if (is_string($components)) {
+            //         $components = json_decode($components, true);
+            //     }
+            //     echo json_encode($components ?: []);
+            // ?>;
+            // const digits = <?php echo $ics_config['digits']; ?>;
+            // const separator = '<?php echo $ics_config['separator']; ?>';
+            // 
+            // fetch('../SYSTEM_ADMIN/tags.php', {
+            //     method: 'POST',
+            //     headers: {
+            //         'Content-Type': 'application/x-www-form-urlencoded',
+            //     },
+            //     body: 'action=generate_preview&tag_type=ics_no&components=' + encodeURIComponent(JSON.stringify(components)) + '&digits=' + digits + '&separator=' + encodeURIComponent(separator)
+            // })
+            // .then(response => response.json())
+            // .then(data => {
+            //     if (data.preview) {
+            //         document.getElementById('ics_no').value = data.preview;
+            //     }
+            // })
+            // .catch(error => {
+            //     console.error('Error generating ICS number:', error);
+            // });
+            // <?php endif; ?>
             
-            fetch('../SYSTEM_ADMIN/tags.php', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: 'action=generate_preview&tag_type=ics_no&components=' + encodeURIComponent(JSON.stringify(components)) + '&digits=' + digits + '&separator=' + encodeURIComponent(separator)
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.preview) {
-                    document.getElementById('ics_no').value = data.preview;
-                }
-            })
-            .catch(error => {
-                console.error('Error generating ICS number:', error);
-            });
-            <?php endif; ?>
+            // Auto-generation disabled - do nothing
         }
         
-        // Handle form submission to update counter
+        // Handle form submission to update counter - COMMENTED OUT FOR MANUAL INPUT
         document.getElementById('icsForm').addEventListener('submit', function(e) {
-            // Always increment counter since field is always auto-generated
-            const incrementField = document.createElement('input');
-            incrementField.type = 'hidden';
-            incrementField.name = 'increment_ics_counter';
-            incrementField.value = '1';
-            this.appendChild(incrementField);
+            // COMMENTED OUT - Auto-generation disabled
+            // // Always increment counter since field is always auto-generated
+            // const incrementField = document.createElement('input');
+            // incrementField.type = 'hidden';
+            // incrementField.name = 'increment_ics_counter';
+            // incrementField.value = '1';
+            // this.appendChild(incrementField);
+            
+            // No counter increment needed for manual input
         });
         
         function showToast(message, type = 'info') {

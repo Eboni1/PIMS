@@ -22,64 +22,68 @@ if (!in_array($_SESSION['role'], ['admin', 'system_admin'])) {
 // Log page access
 logSystemAction($_SESSION['user_id'], 'Accessed Property Acknowledgment Receipt Form', 'forms', 'par_form.php');
 
-// Get next PAR number
-$next_par_no = getNextTagPreview('par_no');
-if ($next_par_no === null) {
-    $next_par_no = ''; // Fallback if no configuration exists
-}
+// Get next PAR number - COMMENTED OUT FOR MANUAL INPUT
+// $next_par_no = getNextTagPreview('par_no');
+// if ($next_par_no === null) {
+//     $next_par_no = ''; // Fallback if no configuration exists
+// }
+$next_par_no = ''; // Empty for manual input
 
-// Get PAR configuration for JavaScript
-$par_config = null;
-$result = $conn->query("SELECT * FROM tag_formats WHERE tag_type = 'par_no' AND status = 'active'");
-if ($result && $row = $result->fetch_assoc()) {
-    $par_config = $row;
-}
+// Get PAR configuration for JavaScript - COMMENTED OUT FOR MANUAL INPUT
+// $par_config = null;
+// $result = $conn->query("SELECT * FROM tag_formats WHERE tag_type = 'par_no' AND status = 'active'");
+// if ($result && $row = $result->fetch_assoc()) {
+//     $par_config = $row;
+// }
+$par_config = null; // Disabled for manual input
 
-// Get Property Number configuration for JavaScript
-$property_config = null;
-$result = $conn->query("SELECT * FROM tag_formats WHERE tag_type = 'property_no' AND status = 'active'");
-if ($result && $row = $result->fetch_assoc()) {
-    $property_config = $row;
-}
+// Get Property Number configuration for JavaScript - COMMENTED OUT FOR MANUAL INPUT
+// $property_config = null;
+// $result = $conn->query("SELECT * FROM tag_formats WHERE tag_type = 'property_no' AND status = 'active'");
+// if ($result && $row = $result->fetch_assoc()) {
+//     $property_config = $row;
+// }
+$property_config = null; // Disabled for manual input
 
-// Generate initial property number for display
-$initial_property_number = '';
-if ($property_config) {
-    $current_number = $property_config['current_number'];
-    $next_number = $current_number + 1;
-    
-    // Build the property number from components
-    $components = json_decode($property_config['format_components'], true);
-    // Handle double-encoded JSON
-    if (is_string($components)) {
-        $components = json_decode($components, true);
-    }
-    
-    if (is_array($components) && !empty($components)) {
-        $parts = [];
-        
-        foreach ($components as $component) {
-            switch($component['type']) {
-                case 'text':
-                    $parts[] = $component['value'] ?? '';
-                    break;
-                case 'digits':
-                    $component_digits = $component['digits'] ?? $property_config['digits'] ?? 4;
-                    $number = str_pad($next_number, $component_digits, '0', STR_PAD_LEFT);
-                    $parts[] = $number;
-                    break;
-                case 'year':
-                    $parts[] = date('Y');
-                    break;
-                case 'month':
-                    $parts[] = date('m');
-                    break;
-            }
-        }
-        
-        $initial_property_number = implode($property_config['separator'] ?? '', $parts);
-    }
-}
+// Generate initial property number for display - COMMENTED OUT FOR MANUAL INPUT
+// $initial_property_number = '';
+// if ($property_config) {
+//     $current_number = $property_config['current_number'];
+//     $next_number = $current_number + 1;
+//     
+//     // Build the property number from components
+//     $components = json_decode($property_config['format_components'], true);
+//     // Handle double-encoded JSON
+//     if (is_string($components)) {
+//         $components = json_decode($components, true);
+//     }
+//     
+//     if (is_array($components) && !empty($components)) {
+//         $parts = [];
+//         
+//         foreach ($components as $component) {
+//             switch($component['type']) {
+//                 case 'text':
+//                     $parts[] = $component['value'] ?? '';
+//                     break;
+//                 case 'digits':
+//                     $component_digits = $component['digits'] ?? $property_config['digits'] ?? 4;
+//                     $number = str_pad($next_number, $component_digits, '0', STR_PAD_LEFT);
+//                     $parts[] = $number;
+//                     break;
+//                 case 'year':
+//                     $parts[] = date('Y');
+//                     break;
+//                 case 'month':
+//                     $parts[] = date('m');
+//                     break;
+//             }
+//         }
+//         
+//         $initial_property_number = implode($property_config['separator'] ?? '', $parts);
+//     }
+// }
+$initial_property_number = ''; // Empty for manual input
 
 // Common units for dropdown
 $common_units = [
@@ -321,8 +325,8 @@ if ($result && $row = $result->fetch_assoc()) {
                             </div>
                             <div class="col-md-4">
                                 <label class="form-label"><strong>PAR No:</strong></label>
-                                <input type="text" class="form-control bg-light" name="par_no" id="par_no" value="<?php echo htmlspecialchars($next_par_no); ?>" readonly>
-                                <small class="text-muted">Auto-generated next number from system configuration.</small>
+                                <input type="text" class="form-control" name="par_no" id="par_no" value="" placeholder="Enter PAR number manually">
+                                <small class="text-muted">Enter PAR number manually.</small>
                             </div>
                         </div>
                         
@@ -354,7 +358,7 @@ if ($result && $row = $result->fetch_assoc()) {
                                                 </select>
                                             </td>
                                             <td><input type="text" class="form-control form-control-sm" name="description[]" required></td>
-                                            <td><input type="text" class="form-control form-control-sm" name="property_number[]" id="initialPropertyNumber" value="<?php echo htmlspecialchars($initial_property_number); ?>" placeholder="Auto-generated"></td>
+                                            <td><input type="text" class="form-control form-control-sm" name="property_number[]" id="initialPropertyNumber" value="" placeholder="Enter property number manually"></td>
                                             <td><input type="date" class="form-control form-control-sm" name="date_acquired[]"></td>
                                             <td><input type="number" step="0.01" class="form-control form-control-sm" name="amount[]" required></td>
                                             <td><button type="button" class="btn btn-sm btn-danger" onclick="removeRow(this)"><i class="bi bi-trash"></i></button></td>
@@ -404,41 +408,45 @@ if ($result && $row = $result->fetch_assoc()) {
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Configuration from PHP
-        const parConfig = <?php echo json_encode($par_config); ?>;
-        const propertyConfig = <?php echo json_encode($property_config); ?>;
+        // Configuration from PHP - COMMENTED OUT FOR MANUAL INPUT
+        // const parConfig = <?php echo json_encode($par_config); ?>;
+        // const propertyConfig = <?php echo json_encode($property_config); ?>;
+        const parConfig = null; // Disabled for manual input
+        const propertyConfig = null; // Disabled for manual input
         
         function generatePropertyNumber() {
-            if (!propertyConfig) return '';
-            
-            // Get current number and increment it
-            const currentNumber = propertyConfig.current_number || 0;
-            const nextNumber = currentNumber + 1;
-            
-            // Build the property number from components
-            const components = JSON.parse(propertyConfig.format_components || '[]');
-            const parts = [];
-            
-            components.forEach(component => {
-                switch(component.type) {
-                    case 'text':
-                        parts.push(component.value || '');
-                        break;
-                    case 'digits':
-                        const digits = component.digits || propertyConfig.digits || 4;
-                        const number = String(nextNumber).padStart(digits, '0');
-                        parts.push(number);
-                        break;
-                    case 'year':
-                        parts.push(new Date().getFullYear());
-                        break;
-                    case 'month':
-                        parts.push(String(new Date().getMonth() + 1).padStart(2, '0'));
-                        break;
-                }
-            });
-            
-            return parts.join(propertyConfig.separator || '');
+            // COMMENTED OUT FOR MANUAL INPUT
+            // if (!propertyConfig) return '';
+            // 
+            // // Get current number and increment it
+            // const currentNumber = propertyConfig.current_number || 0;
+            // const nextNumber = currentNumber + 1;
+            // 
+            // // Build the property number from components
+            // const components = JSON.parse(propertyConfig.format_components || '[]');
+            // const parts = [];
+            // 
+            // components.forEach(component => {
+            //     switch(component.type) {
+            //         case 'text':
+            //             parts.push(component.value || '');
+            //             break;
+            //         case 'digits':
+            //             const digits = component.digits || propertyConfig.digits || 4;
+            //             const number = String(nextNumber).padStart(digits, '0');
+            //             parts.push(number);
+            //             break;
+            //         case 'year':
+            //             parts.push(new Date().getFullYear());
+            //             break;
+            //         case 'month':
+            //             parts.push(String(new Date().getMonth() + 1).padStart(2, '0'));
+            //             break;
+            //     }
+            // });
+            // 
+            // return parts.join(propertyConfig.separator || '');
+            return ''; // Return empty for manual input
         }
         
         function addRow() {
@@ -454,14 +462,15 @@ if ($result && $row = $result->fetch_assoc()) {
                 echo json_encode($options);
             ?>;
             
-            // Generate auto property number for new row
-            const autoPropertyNumber = generatePropertyNumber();
+            // Generate auto property number for new row - COMMENTED OUT FOR MANUAL INPUT
+            // const autoPropertyNumber = generatePropertyNumber();
+            const autoPropertyNumber = ''; // Empty for manual input
             
             const cells = [
                 '<input type="number" class="form-control form-control-sm" name="quantity[]" required onchange="calculateAmount(this)">',
                 '<select class="form-select form-select-sm" name="unit[]" required>' + unitOptions + '</select>',
                 '<input type="text" class="form-control form-control-sm" name="description[]" required>',
-                '<input type="text" class="form-control form-control-sm" name="property_number[]" value="' + autoPropertyNumber + '" placeholder="Auto-generated">',
+                '<input type="text" class="form-control form-control-sm" name="property_number[]" value="' + autoPropertyNumber + '" placeholder="Enter property number manually">',
                 '<input type="date" class="form-control form-control-sm" name="date_acquired[]">',
                 '<input type="number" step="0.01" class="form-control form-control-sm" name="amount[]" required>',
                 '<button type="button" class="btn btn-sm btn-danger" onclick="removeRow(this)"><i class="bi bi-trash"></i></button>'
@@ -473,13 +482,14 @@ if ($result && $row = $result->fetch_assoc()) {
             });
         }
         
-        // Initialize the form with auto-generated property numbers
+        // Initialize the form with auto-generated property numbers - COMMENTED OUT FOR MANUAL INPUT
         function initializeForm() {
-            // Set initial property number
-            const initialPropertyField = document.getElementById('initialPropertyNumber');
-            if (initialPropertyField && !initialPropertyField.value) {
-                initialPropertyField.value = generatePropertyNumber();
-            }
+            // Set initial property number - COMMENTED OUT
+            // const initialPropertyField = document.getElementById('initialPropertyNumber');
+            // if (initialPropertyField && !initialPropertyField.value) {
+            //     initialPropertyField.value = generatePropertyNumber();
+            // }
+            // No initialization needed for manual input
         }
         
         // Initialize when document is ready
@@ -531,46 +541,52 @@ if ($result && $row = $result->fetch_assoc()) {
             window.location.href = 'par_entries.php';
         }
         
-        // Generate new PAR number via AJAX
+        // Generate new PAR number via AJAX - COMMENTED OUT FOR MANUAL INPUT
         function generateNewParNumber() {
-            <?php if ($par_config): ?>
-            const components = <?php 
-                $components = json_decode($par_config['format_components'], true);
-                if (is_string($components)) {
-                    $components = json_decode($components, true);
-                }
-                echo json_encode($components ?: []);
-            ?>;
-            const digits = <?php echo $par_config['digits']; ?>;
-            const separator = '<?php echo $par_config['separator']; ?>';
+            // COMMENTED OUT - Auto-generation disabled
+            // <?php if ($par_config): ?>
+            // const components = <?php 
+            //     $components = json_decode($par_config['format_components'], true);
+            //     if (is_string($components)) {
+            //         $components = json_decode($components, true);
+            //     }
+            //     echo json_encode($components ?: []);
+            // ?>;
+            // const digits = <?php echo $par_config['digits']; ?>;
+            // const separator = '<?php echo $par_config['separator']; ?>';
+            // 
+            // fetch('../SYSTEM_ADMIN/tags.php', {
+            //     method: 'POST',
+            //     headers: {
+            //         'Content-Type': 'application/x-www-form-urlencoded',
+            //     },
+            //     body: 'action=generate_preview&tag_type=par_no&components=' + encodeURIComponent(JSON.stringify(components)) + '&digits=' + digits + '&separator=' + encodeURIComponent(separator)
+            // })
+            // .then(response => response.json())
+            // .then(data => {
+            //     if (data.preview) {
+            //         document.getElementById('par_no').value = data.preview;
+            //     }
+            // })
+            // .catch(error => {
+            //     console.error('Error generating PAR number:', error);
+            // });
+            // <?php endif; ?>
             
-            fetch('../SYSTEM_ADMIN/tags.php', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: 'action=generate_preview&tag_type=par_no&components=' + encodeURIComponent(JSON.stringify(components)) + '&digits=' + digits + '&separator=' + encodeURIComponent(separator)
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.preview) {
-                    document.getElementById('par_no').value = data.preview;
-                }
-            })
-            .catch(error => {
-                console.error('Error generating PAR number:', error);
-            });
-            <?php endif; ?>
+            // Auto-generation disabled - do nothing
         }
         
-        // Handle form submission to update counter
+        // Handle form submission to update counter - COMMENTED OUT FOR MANUAL INPUT
         document.getElementById('parForm').addEventListener('submit', function(e) {
-            // Always increment counter since field is always auto-generated
-            const incrementField = document.createElement('input');
-            incrementField.type = 'hidden';
-            incrementField.name = 'increment_par_counter';
-            incrementField.value = '1';
-            this.appendChild(incrementField);
+            // COMMENTED OUT - Auto-generation disabled
+            // // Always increment counter since field is always auto-generated
+            // const incrementField = document.createElement('input');
+            // incrementField.type = 'hidden';
+            // incrementField.name = 'increment_par_counter';
+            // incrementField.value = '1';
+            // this.appendChild(incrementField);
+            
+            // No counter increment needed for manual input
         });
     </script>
 </body>
