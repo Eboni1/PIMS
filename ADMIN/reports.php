@@ -400,8 +400,8 @@ function formatStatus($status) {
         }
         
         .table th {
-            background: var(--primary-color);
-            color: white;
+            background: transparent;
+            color: #333;
             border: none;
             font-weight: 600;
             text-transform: uppercase;
@@ -566,28 +566,71 @@ function formatStatus($status) {
             </div>
         </div>
         
-        <!-- Report Type Tabs -->
-        <div class="report-card">
-            <ul class="nav nav-tabs" id="reportTabs" role="tablist">
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link <?php echo $report_type === 'assets' ? 'active' : ''; ?>" 
-                            onclick="window.location.href='reports.php?type=assets'">
-                        <i class="bi bi-box"></i> Assets Report
-                    </button>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link <?php echo $report_type === 'employees' ? 'active' : ''; ?>" 
-                            onclick="window.location.href='reports.php?type=employees'">
-                        <i class="bi bi-people"></i> Employees Report
-                    </button>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link <?php echo $report_type === 'summary' ? 'active' : ''; ?>" 
-                            onclick="window.location.href='reports.php?type=summary'">
-                        <i class="bi bi-graph-up"></i> Summary Report
-                    </button>
-                </li>
-            </ul>
+        <!-- Statistics Cards -->
+        <div class="row mb-4">
+            <?php if ($report_type === 'assets'): ?>
+                <div class="col-md-3">
+                    <div class="stats-card">
+                        <div class="stats-number"><?php echo $total_count; ?></div>
+                        <div class="stats-label">Total Assets</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stats-card">
+                        <div class="stats-number">₱<?php echo number_format($total_value, 2); ?></div>
+                        <div class="stats-label">Total Value</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stats-card">
+                        <div class="stats-number"><?php echo count($offices); ?></div>
+                        <div class="stats-label">Offices</div>
+                    </div>
+                </div>
+            <?php elseif ($report_type === 'employees'): ?>
+                <div class="col-md-3">
+                    <div class="stats-card">
+                        <div class="stats-number"><?php echo $total_count; ?></div>
+                        <div class="stats-label">Total Employees</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stats-card">
+                        <div class="stats-number"><?php 
+                            $permanent_count = 0;
+                            foreach ($data as $emp) {
+                                if ($emp['employment_status'] === 'permanent') $permanent_count++;
+                            }
+                            echo $permanent_count;
+                        ?></div>
+                        <div class="stats-label">Permanent</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stats-card">
+                        <div class="stats-number"><?php 
+                            $cleared_count = 0;
+                            foreach ($data as $emp) {
+                                if ($emp['clearance_status'] === 'cleared') $cleared_count++;
+                            }
+                            echo $cleared_count;
+                        ?></div>
+                        <div class="stats-label">Cleared</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stats-card">
+                        <div class="stats-number"><?php 
+                            $uncleared_count = 0;
+                            foreach ($data as $emp) {
+                                if ($emp['clearance_status'] === 'uncleared') $uncleared_count++;
+                            }
+                            echo $uncleared_count;
+                        ?></div>
+                        <div class="stats-label">Uncleared</div>
+                    </div>
+                </div>
+            <?php endif; ?>
         </div>
         
         <!-- Filters Section -->
@@ -676,78 +719,29 @@ function formatStatus($status) {
                 </div>
             </form>
         </div>
-        
-        <!-- Statistics Cards -->
-        <div class="row mb-4">
-            <?php if ($report_type === 'assets'): ?>
-                <div class="col-md-3">
-                    <div class="stats-card">
-                        <div class="stats-number"><?php echo $total_count; ?></div>
-                        <div class="stats-label">Total Assets</div>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="stats-card">
-                        <div class="stats-number">₱<?php echo number_format($total_value, 2); ?></div>
-                        <div class="stats-label">Total Value</div>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="stats-card">
-                        <div class="stats-number">₱<?php echo $total_count > 0 ? number_format($total_value / $total_count, 2) : '0.00'; ?></div>
-                        <div class="stats-label">Average Value</div>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="stats-card">
-                        <div class="stats-number"><?php echo count($offices); ?></div>
-                        <div class="stats-label">Offices</div>
-                    </div>
-                </div>
-            <?php elseif ($report_type === 'employees'): ?>
-                <div class="col-md-3">
-                    <div class="stats-card">
-                        <div class="stats-number"><?php echo $total_count; ?></div>
-                        <div class="stats-label">Total Employees</div>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="stats-card">
-                        <div class="stats-number"><?php 
-                            $permanent_count = 0;
-                            foreach ($data as $emp) {
-                                if ($emp['employment_status'] === 'permanent') $permanent_count++;
-                            }
-                            echo $permanent_count;
-                        ?></div>
-                        <div class="stats-label">Permanent</div>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="stats-card">
-                        <div class="stats-number"><?php 
-                            $cleared_count = 0;
-                            foreach ($data as $emp) {
-                                if ($emp['clearance_status'] === 'cleared') $cleared_count++;
-                            }
-                            echo $cleared_count;
-                        ?></div>
-                        <div class="stats-label">Cleared</div>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="stats-card">
-                        <div class="stats-number"><?php 
-                            $uncleared_count = 0;
-                            foreach ($data as $emp) {
-                                if ($emp['clearance_status'] === 'uncleared') $uncleared_count++;
-                            }
-                            echo $uncleared_count;
-                        ?></div>
-                        <div class="stats-label">Uncleared</div>
-                    </div>
-                </div>
-            <?php endif; ?>
+
+        <!-- Report Type Tabs -->
+        <div class="report-card">
+            <ul class="nav nav-tabs" id="reportTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link <?php echo $report_type === 'assets' ? 'active' : ''; ?>" 
+                            onclick="window.location.href='reports.php?type=assets'">
+                        <i class="bi bi-box"></i> Assets Report
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link <?php echo $report_type === 'employees' ? 'active' : ''; ?>" 
+                            onclick="window.location.href='reports.php?type=employees'">
+                        <i class="bi bi-people"></i> Employees Report
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link <?php echo $report_type === 'summary' ? 'active' : ''; ?>" 
+                            onclick="window.location.href='reports.php?type=summary'">
+                        <i class="bi bi-graph-up"></i> Summary Report
+                    </button>
+                </li>
+            </ul>
         </div>
         
         <!-- Report Content -->
