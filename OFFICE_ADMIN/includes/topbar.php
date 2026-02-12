@@ -23,19 +23,33 @@
         
         <!-- Notifications -->
         <div class="topbar-notifications dropdown">
-            <button class="btn btn-link position-relative" type="button" id="notificationDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+            <button class="btn btn-link position-relative notification-bell" type="button" id="notificationDropdown" data-bs-toggle="dropdown" aria-expanded="false">
                 <i class="bi bi-bell"></i>
-                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
-                    3
-                </span>
+                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger notification-badge" id="notificationBadge" style="display: none;">0</span>
             </button>
-            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="notificationDropdown">
-                <li><h6 class="dropdown-header">Notifications</h6></li>
-                <li><a class="dropdown-item" href="#">New consumable request pending</a></li>
-                <li><a class="dropdown-item" href">Asset maintenance due</a></li>
-                <li><a class="dropdown-item" href="#">Low stock alert</a></li>
-                <li><hr class="dropdown-divider"></li>
-                <li><a class="dropdown-item text-center" href="#">View all notifications</a></li>
+            <ul class="dropdown-menu dropdown-menu-end notification-dropdown" aria-labelledby="notificationDropdown">
+                <li class="notification-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0">Notifications</h6>
+                        <div class="notification-actions">
+                            <a href="#" class="mark-all-read" title="Mark all as read">
+                                <i class="bi bi-check2-all"></i>
+                            </a>
+                        </div>
+                    </div>
+                </li>
+                <li>
+                    <div class="notification-list" id="notificationList">
+                        <div class="notification-loading">
+                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </div>
+                    </div>
+                </li>
+                <li class="notification-footer">
+                    <a class="dropdown-item text-center" href="../ADMIN/notifications.php">View All Notifications</a>
+                </li>
             </ul>
         </div>
         
