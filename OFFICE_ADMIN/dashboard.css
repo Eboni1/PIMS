@@ -17,6 +17,7 @@ body {
     flex: 1;
     margin-left: 0;
     padding: 2rem;
+    padding-top: 90px;
     transition: margin-left 0.3s ease;
     overflow-y: auto;
     max-height: 100vh;
@@ -44,6 +45,9 @@ body {
 .sidebar-header {
     padding: 1.5rem;
     border-bottom: 1px solid rgba(255,255,255,0.1);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 
 .sidebar-brand {
@@ -132,7 +136,7 @@ body {
     position: fixed;
     top: 0;
     right: 0;
-    left: 280px;
+    left: 0;
     height: 70px;
     background: white;
     box-shadow: 0 2px 10px rgba(0,0,0,0.05);
@@ -141,11 +145,7 @@ body {
     align-items: center;
     justify-content: space-between;
     padding: 0 2rem;
-    transition: left 0.3s ease;
-}
-
-.topbar.sidebar-collapsed {
-    left: 0;
+    transition: all 0.3s ease;
 }
 
 .topbar-left {
@@ -236,16 +236,11 @@ body {
 
 /* Sidebar Toggle */
 .sidebar-toggle {
-    position: fixed;
-    top: 1rem;
-    left: 1rem;
-    z-index: 1001;
-    background: white;
+    background: rgba(255,255,255,0.1);
     border: none;
-    padding: 0.75rem;
+    padding: 0.5rem;
     border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    color: #191BA9;
+    color: white;
     font-size: 1.2rem;
     cursor: pointer;
     transition: all 0.3s ease;
@@ -253,15 +248,38 @@ body {
 }
 
 .sidebar-toggle:hover {
-    background: #5CC2F2;
+    background: rgba(255,255,255,0.2);
     color: white;
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(92, 194, 242, 0.3);
 }
 
 .sidebar-toggle.active {
-    background: #5CC2F2;
+    background: rgba(255,255,255,0.3);
     color: white;
+}
+
+/* Topbar Toggle Button */
+.topbar .sidebar-toggle {
+    position: static;
+    background: transparent;
+    border: none;
+    padding: 0.5rem;
+    border-radius: 8px;
+    color: #191BA9;
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin-right: 1rem;
+}
+
+.topbar .sidebar-toggle:hover {
+    background: rgba(92, 194, 242, 0.1);
+    color: #5CC2F2;
+}
+
+.topbar .sidebar-toggle.active {
+    background: rgba(92, 194, 242, 0.2);
+    color: #5CC2F2;
 }
 
 /* Sidebar Overlay */
@@ -450,10 +468,6 @@ body {
         padding-top: 90px;
     }
     
-    .topbar {
-        left: 0;
-    }
-    
     .sidebar {
         transform: translateX(-100%);
     }
@@ -478,6 +492,8 @@ body {
     
     .main-content {
         margin-left: 0;
+        padding: 2rem;
+        padding-top: 90px;
     }
     
     .sidebar.show ~ .main-content {

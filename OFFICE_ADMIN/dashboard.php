@@ -365,7 +365,6 @@ $page_title = 'Office Dashboard';
 ?>
 <!-- Main Content Wrapper -->
     <div class="main-wrapper" id="mainWrapper">
-        <?php require_once 'includes/sidebar-toggle.php'; ?>
         <?php require_once 'includes/sidebar.php'; ?>
         <?php require_once 'includes/topbar.php'; ?>
     

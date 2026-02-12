@@ -1,6 +1,10 @@
 <!-- Topbar -->
 <header class="topbar" id="topbar">
     <div class="topbar-left">
+        <!-- Sidebar Toggle Button -->
+        <button class="sidebar-toggle" id="sidebarToggle">
+            <i class="bi bi-list"></i>
+        </button>
         <div class="topbar-title">
             <h5 class="mb-0"><?php echo $page_title ?? 'Office Admin'; ?></h5>
         </div>

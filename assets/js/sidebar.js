@@ -1,7 +1,6 @@
 // Sidebar Toggle Functionality
 document.addEventListener('DOMContentLoaded', function() {
     const sidebar = document.getElementById('sidebar');
-    const sidebarToggle = document.getElementById('sidebarToggle');
     const sidebarOverlay = document.createElement('div');
     const topbar = document.querySelector('.topbar');
     const mainContent = document.querySelector('.main-content');
@@ -10,14 +9,17 @@ document.addEventListener('DOMContentLoaded', function() {
     sidebarOverlay.className = 'sidebar-overlay';
     document.body.appendChild(sidebarOverlay);
     
-    // Toggle sidebar
+    // Handle both toggle buttons
     function toggleSidebar() {
         const isOpen = sidebar.classList.contains('show');
         
         if (isOpen) {
             sidebar.classList.remove('show');
             sidebarOverlay.classList.remove('show');
-            sidebarToggle.classList.remove('active');
+            // Update both toggle buttons
+            document.querySelectorAll('.sidebar-toggle').forEach(btn => {
+                btn.classList.remove('active');
+            });
             // Adjust main content margin
             if (window.innerWidth > 1024) {
                 mainContent.style.marginLeft = '0';
@@ -25,7 +27,10 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
             sidebar.classList.add('show');
             sidebarOverlay.classList.add('show');
-            sidebarToggle.classList.add('active');
+            // Update both toggle buttons
+            document.querySelectorAll('.sidebar-toggle').forEach(btn => {
+                btn.classList.add('active');
+            });
             // Adjust main content margin
             if (window.innerWidth > 1024) {
                 mainContent.style.marginLeft = '280px';
@@ -37,7 +42,10 @@ document.addEventListener('DOMContentLoaded', function() {
     function closeSidebar() {
         sidebar.classList.remove('show');
         sidebarOverlay.classList.remove('show');
-        sidebarToggle.classList.remove('active');
+        // Update both toggle buttons
+        document.querySelectorAll('.sidebar-toggle').forEach(btn => {
+            btn.classList.remove('active');
+        });
         // Adjust main content margin
         if (window.innerWidth > 1024) {
             mainContent.style.marginLeft = '0';
@@ -58,15 +66,17 @@ document.addEventListener('DOMContentLoaded', function() {
             // Mobile/tablet: sidebar is always hidden by default
             sidebar.classList.remove('show');
             sidebarOverlay.classList.remove('show');
-            sidebarToggle.classList.remove('active');
+            document.querySelectorAll('.sidebar-toggle').forEach(btn => {
+                btn.classList.remove('active');
+            });
             mainContent.style.marginLeft = '0';
         }
     }
     
-    // Event listeners
-    if (sidebarToggle) {
-        sidebarToggle.addEventListener('click', toggleSidebar);
-    }
+    // Event listeners for both toggle buttons
+    document.querySelectorAll('.sidebar-toggle').forEach(button => {
+        button.addEventListener('click', toggleSidebar);
+    });
     
     sidebarOverlay.addEventListener('click', closeSidebar);
     
