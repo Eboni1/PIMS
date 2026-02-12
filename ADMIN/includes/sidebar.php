@@ -361,6 +361,10 @@ try {
             <i class="bi bi-credit-card"></i>
             Property Card
         </a>
+        <a href="borrowing.php" class="sidebar-nav-item <?php echo $current_page == 'borrowing.php' ? 'active' : ''; ?>">
+            <i class="bi bi-arrow-left-right"></i>
+            Borrowing
+        </a>
         <div class="sidebar-dropdown">
             <button class="sidebar-dropdown-toggle <?php echo (in_array($current_page, ['par_form.php', 'ics_form.php', 'ris_form.php', 'iirup_form.php', 'itr_form.php'])) ? 'active' : ''; ?>" 
                     type="button" data-bs-toggle="collapse" data-bs-target="#formsDropdown" 
