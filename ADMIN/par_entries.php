@@ -26,8 +26,8 @@ $par_forms = [];
 $result = $conn->query("
     SELECT 
         f.*,
-        COUNT(i.id) as item_count,
-        SUM(i.amount) as total_value
+        SUM(i.quantity) as item_count,
+        SUM(i.quantity * i.amount) as total_value
     FROM par_forms f 
     LEFT JOIN par_items i ON f.id = i.form_id 
     GROUP BY f.id 
