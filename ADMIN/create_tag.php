@@ -57,6 +57,29 @@ while ($category_row = $categories_result->fetch_assoc()) {
     $categories[] = $category_row;
 }
 
+// Get all offices for dropdown
+$offices = [];
+$offices_sql = "SELECT id, office_name, office_code FROM offices WHERE status = 'active' ORDER BY office_name";
+$offices_result = $conn->query($offices_sql);
+while ($office_row = $offices_result->fetch_assoc()) {
+    $offices[] = $office_row;
+}
+
+// Get subcategories for the selected category (if any)
+$subcategories = [];
+$selected_category_id = $item['category_id'] ?? 0;
+if ($selected_category_id > 0) {
+    $subcategories_sql = "SELECT id, sub_category_code, sub_category_name FROM asset_sub_categories WHERE asset_categories_id = ? AND status = 'active' ORDER BY sub_category_code";
+    $subcategories_stmt = $conn->prepare($subcategories_sql);
+    $subcategories_stmt->bind_param("i", $selected_category_id);
+    $subcategories_stmt->execute();
+    $subcategories_result = $subcategories_stmt->get_result();
+    while ($subcategory_row = $subcategories_result->fetch_assoc()) {
+        $subcategories[] = $subcategory_row;
+    }
+    $subcategories_stmt->close();
+}
+
 // Get active employees for dropdown
 $employees = [];
 $employees_sql = "SELECT id, employee_no, firstname, lastname FROM employees WHERE employment_status = 'permanent' ORDER BY lastname, firstname";
@@ -78,7 +101,11 @@ function generateTagNumber($format) {
     if (!$format) return '';
     
     $components = json_decode($format['format_components'], true);
-    if (!$components) return '';
+    // Handle double-encoded JSON - if we get a string, decode it again
+    if (is_string($components)) {
+        $components = json_decode($components, true);
+    }
+    if (!$components || !is_array($components)) return '';
     
     $tag_number = '';
     $current_number = $format['current_number'] + 1;
@@ -119,7 +146,7 @@ if ($tag_format) {
     $generated_inventory_tag = generateTagNumber($tag_format);
 }
 $category_fields = [
-    'VH' => [
+    '07' => [
         'brand' => ['label' => 'Brand', 'type' => 'text', 'required' => true],
         'model' => ['label' => 'Model', 'type' => 'text', 'required' => true],
         'plate_number' => ['label' => 'Plate Number', 'type' => 'text', 'required' => true],
@@ -128,38 +155,38 @@ $category_fields = [
         'chassis_number' => ['label' => 'Chassis Number', 'type' => 'text', 'required' => false],
         'year_model' => ['label' => 'Year Model', 'type' => 'number', 'required' => false]
     ],
-    'ITS' => [
+    '030' => [
         'processor' => ['label' => 'Processor', 'type' => 'text', 'required' => true],
         'ram' => ['label' => 'RAM (GB)', 'type' => 'text', 'required' => true],
         'storage' => ['label' => 'Storage', 'type' => 'text', 'required' => true],
         'operating_system' => ['label' => 'Operating System', 'type' => 'text', 'required' => false],
         'serial_number' => ['label' => 'Serial Number', 'type' => 'text', 'required' => false]
     ],
-    'FF' => [
+    '02' => [
         'material' => ['label' => 'Material', 'type' => 'text', 'required' => true],
         'dimensions' => ['label' => 'Dimensions (LxWxH)', 'type' => 'text', 'required' => false],
         'color' => ['label' => 'Color', 'type' => 'text', 'required' => false],
         'manufacturer' => ['label' => 'Manufacturer', 'type' => 'text', 'required' => false]
     ],
-    'ME' => [
+    '04' => [
         'manufacturer' => ['label' => 'Manufacturer', 'type' => 'text', 'required' => true],
         'model' => ['label' => 'Model', 'type' => 'text', 'required' => true],
         'capacity' => ['label' => 'Capacity', 'type' => 'text', 'required' => false],
         'power_rating' => ['label' => 'Power Rating', 'type' => 'text', 'required' => false],
         'serial_number' => ['label' => 'Serial Number', 'type' => 'text', 'required' => false]
     ],
-    'OE' => [
+    '05' => [
         'brand' => ['label' => 'Brand', 'type' => 'text', 'required' => true],
         'model' => ['label' => 'Model', 'type' => 'text', 'required' => false],
         'serial_number' => ['label' => 'Serial Number', 'type' => 'text', 'required' => false]
     ],
-    'SW' => [
+    '06' => [
         'software_name' => ['label' => 'Software Name', 'type' => 'text', 'required' => true],
         'version' => ['label' => 'Version', 'type' => 'text', 'required' => true],
         'license_key' => ['label' => 'License Key', 'type' => 'text', 'required' => false],
         'expiry_date' => ['label' => 'Expiry Date', 'type' => 'date', 'required' => false]
     ],
-    'LD' => [
+    '03' => [
         'lot_number' => ['label' => 'Lot Number', 'type' => 'text', 'required' => true],
         'area_size' => ['label' => 'Area Size (sqm)', 'type' => 'text', 'required' => true],
         'location' => ['label' => 'Location', 'type' => 'text', 'required' => true],
@@ -321,6 +348,29 @@ $category_fields = [
             </div>
         </div>
 
+        <!-- Messages Display -->
+        <?php if (isset($_SESSION['success'])): ?>
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                <i class="bi bi-check-circle-fill me-2"></i>
+                <?php 
+                echo htmlspecialchars($_SESSION['success']); 
+                unset($_SESSION['success']);
+                ?>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        <?php endif; ?>
+
+        <?php if (isset($_SESSION['error'])): ?>
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                <?php 
+                echo htmlspecialchars($_SESSION['error']); 
+                unset($_SESSION['error']);
+                ?>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        <?php endif; ?>
+
         <!-- Tag Creation Form -->
         <div class="form-container">
             <form method="POST" action="process_tag.php" id="tagForm" enctype="multipart/form-data">
@@ -329,7 +379,7 @@ $category_fields = [
                 <input type="hidden" name="current_number" value="<?php echo $tag_format['current_number'] ?? ''; ?>">
                 
                 <div class="row">
-                    <div class="col-md-6">
+                    <div class="col-md-4">
                         <div class="mb-3">
                             <label for="category_id" class="form-label">Category <span class="required">*</span></label>
                             <select class="form-select" id="category_id" name="category_id" required>
@@ -342,10 +392,30 @@ $category_fields = [
                             </select>
                         </div>
                     </div>
-                    <div class="col-md-6">
+                    <div class="col-md-4">
                         <div class="mb-3">
-                            <label for="property_no" class="form-label">Property Number <span class="required">*</span></label>
-                            <input type="text" class="form-control" id="property_no" name="property_no" value="<?php echo htmlspecialchars($item['property_no'] ?? ''); ?>" required>
+                            <label for="subcategory_id" class="form-label">Subcategory</label>
+                            <select class="form-select" id="subcategory_id" name="subcategory_id" <?php echo $selected_category_id == 0 ? 'disabled' : ''; ?>>
+                                <option value="">Select Subcategory</option>
+                                <?php foreach ($subcategories as $subcategory): ?>
+                                    <option value="<?php echo $subcategory['id']; ?>" <?php echo ($subcategory['id'] == $item['asset_subcategory_id']) ? 'selected' : ''; ?>>
+                                        <?php echo htmlspecialchars($subcategory['sub_category_code'] . ' - ' . $subcategory['sub_category_name']); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="mb-3">
+                            <label for="office_id" class="form-label">Office <span class="required">*</span></label>
+                            <select class="form-select" id="office_id" name="office_id" required>
+                                <option value="">Select Office</option>
+                                <?php foreach ($offices as $office): ?>
+                                    <option value="<?php echo $office['id']; ?>" <?php echo ($office['id'] == $item['office_id']) ? 'selected' : ''; ?>>
+                                        <?php echo htmlspecialchars($office['office_code'] . ' - ' . $office['office_name']); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
                         </div>
                     </div>
                 </div>
@@ -353,11 +423,19 @@ $category_fields = [
                 <div class="row">
                     <div class="col-md-6">
                         <div class="mb-3">
-                            <label for="inventory_tag" class="form-label">Inventory Tag Number <span class="required">*</span></label>
-                            <input type="text" class="form-control" id="inventory_tag" name="inventory_tag" value="<?php echo htmlspecialchars($generated_inventory_tag); ?>" readonly required>
-                            <small class="form-text text-muted">Auto-generated from tag format</small>
+                            <label for="property_no" class="form-label">Property Number <span class="required">*</span></label>
+                            <input type="text" class="form-control" id="property_no" name="property_no" value="<?php echo htmlspecialchars($item['property_no'] ?? ''); ?>" required>
                         </div>
                     </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="end_user" class="form-label">End User <span class="required">*</span></label>
+                            <input type="text" class="form-control" id="end_user" name="end_user" placeholder="Enter end user name" required>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
                     <div class="col-md-6">
                         <div class="mb-3">
                             <label for="person_accountable" class="form-label">Person Accountable <span class="required">*</span></label>
@@ -371,24 +449,18 @@ $category_fields = [
                             </select>
                         </div>
                     </div>
-                </div>
-                
-                <div class="row">
-                    <div class="col-md-12">
-                        <div class="mb-3">
-                            <label for="end_user" class="form-label">End User <span class="required">*</span></label>
-                            <input type="text" class="form-control" id="end_user" name="end_user" placeholder="Enter end user name" required>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="row">
                     <div class="col-md-6">
                         <div class="mb-3">
                             <label for="date_counted" class="form-label">Date Counted <span class="required">*</span></label>
                             <input type="date" class="form-control" id="date_counted" name="date_counted" value="<?php echo date('Y-m-d'); ?>" required>
                         </div>
                     </div>
+                </div>
+                
+                <!-- Category-specific fields will be loaded here -->
+                <div id="categorySpecificFields"></div>
+                
+                <div class="row">
                     <div class="col-md-6">
                         <div class="mb-3">
                             <label for="asset_image" class="form-label">Asset Image</label>
@@ -397,10 +469,10 @@ $category_fields = [
                             <div id="imagePreview" class="mt-2"></div>
                         </div>
                     </div>
+                    <div class="col-md-6">
+                        <!-- Empty column for balance -->
+                    </div>
                 </div>
-                
-                <!-- Category-specific fields will be loaded here -->
-                <div id="categorySpecificFields"></div>
                 
                 <div class="row">
                     <div class="col-md-12">
@@ -471,15 +543,50 @@ $category_fields = [
         // Function to get category name from code
         function getCategoryName(categoryCode) {
             const categoryNames = {
-                'VH': 'Vehicles',
-                'ITS': 'Computer Equipment',
-                'FF': 'Furniture & Fixtures',
-                'ME': 'Machinery & Equipment',
-                'OE': 'Office Equipment',
-                'SW': 'Software',
-                'LD': 'Land'
+                '07': 'Vehicles',
+                '030': 'Computer Equipment',
+                '02': 'Furniture & Fixtures',
+                '04': 'Machinery & Equipment',
+                '05': 'Office Equipment',
+                '06': 'Software',
+                '03': 'Land'
             };
             return categoryNames[categoryCode] || 'Unknown';
+        }
+        
+        // Function to load subcategories dynamically
+        function loadSubcategories(categoryId) {
+            const subcategorySelect = document.getElementById('subcategory_id');
+            
+            if (!categoryId || categoryId <= 0) {
+                subcategorySelect.innerHTML = '<option value="">Select Subcategory</option>';
+                subcategorySelect.disabled = true;
+                return;
+            }
+            
+            fetch('../api/get_dropdown_data.php?action=get_subcategories&category_id=' + categoryId)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        subcategorySelect.innerHTML = '<option value="">Select Subcategory</option>';
+                        data.subcategories.forEach(subcategory => {
+                            const option = document.createElement('option');
+                            option.value = subcategory.id;
+                            option.textContent = subcategory.sub_category_code + ' - ' + subcategory.sub_category_name;
+                            subcategorySelect.appendChild(option);
+                        });
+                        subcategorySelect.disabled = false;
+                    } else {
+                        console.error('Error loading subcategories:', data.error);
+                        subcategorySelect.innerHTML = '<option value="">Error loading subcategories</option>';
+                        subcategorySelect.disabled = true;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading subcategories:', error);
+                    subcategorySelect.innerHTML = '<option value="">Error loading subcategories</option>';
+                    subcategorySelect.disabled = true;
+                });
         }
         
         // Event listener for category change
@@ -488,6 +595,22 @@ $category_fields = [
             $('#person_accountable').select2({
                 theme: 'bootstrap-5',
                 placeholder: 'Search and select employee...',
+                allowClear: true,
+                width: '100%'
+            });
+            
+            // Initialize Select2 for office dropdown
+            $('#office_id').select2({
+                theme: 'bootstrap-5',
+                placeholder: 'Search and select office...',
+                allowClear: true,
+                width: '100%'
+            });
+            
+            // Initialize Select2 for subcategory dropdown
+            $('#subcategory_id').select2({
+                theme: 'bootstrap-5',
+                placeholder: 'Search and select subcategory...',
                 allowClear: true,
                 width: '100%'
             });
@@ -537,11 +660,23 @@ $category_fields = [
             const categoryCode = selectedOption.getAttribute('data-category-code');
             loadCategoryFields(categoryCode);
             
-            // Load fields when category changes
+            // Load subcategories for current category on page load
+            const selectedCategoryId = categorySelect.value;
+            if (selectedCategoryId) {
+                loadSubcategories(selectedCategoryId);
+            }
+            
+            // Load fields and subcategories when category changes
             categorySelect.addEventListener('change', function() {
                 const selectedOption = this.options[this.selectedIndex];
                 const categoryCode = selectedOption.getAttribute('data-category-code');
+                const categoryId = this.value;
+                
+                // Load category-specific fields
                 loadCategoryFields(categoryCode);
+                
+                // Load subcategories dynamically
+                loadSubcategories(categoryId);
             });
             
             // Auto-fill property number if empty

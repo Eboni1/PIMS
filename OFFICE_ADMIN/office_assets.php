@@ -13,85 +13,78 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
     exit();
 }
 
-// Check if user has correct role (office_admin or admin)
+// Check if user has correct role
 if ($_SESSION['role'] !== 'office_admin' && $_SESSION['role'] !== 'admin' && $_SESSION['role'] !== 'system_admin') {
     header('Location: ../index.php');
     exit();
 }
 
-require_once '../config.php';
-require_once '../includes/logger.php';
+// Set page title for topbar
+$page_title = 'Office Assets';
 
-// Log office assets page access
-logSystemAction($_SESSION['user_id'], 'access', 'office_assets', 'Office admin accessed office assets page');
-
-// Handle form submissions
-$message = '';
-$message_type = '';
-
-// Get office assets
+// Get office-specific assets
 $assets = [];
-try {
-    $office_id = $_SESSION['office_id'];
-    $stmt = $conn->prepare("
-        SELECT ai.*, a.description as asset_description, ac.name as category_name, 
-               e.firstname, e.lastname, o.office_name 
-        FROM asset_items ai 
-        LEFT JOIN assets a ON ai.asset_id = a.id 
-        LEFT JOIN asset_categories ac ON a.asset_categories_id = ac.id 
-        LEFT JOIN employees e ON ai.employee_id = e.id 
-        LEFT JOIN offices o ON ai.office_id = o.id 
-        WHERE ai.office_id = ? 
-        ORDER BY ai.last_updated DESC
-    ");
-    $stmt->bind_param("i", $office_id);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    
-    while ($row = $result->fetch_assoc()) {
-        $assets[] = $row;
+$stats = [
+    'total_assets' => 0,
+    'total_value' => 0,
+    'in_maintenance' => 0,
+    'disposed' => 0
+];
+
+$user_office = $_SESSION['office'] ?? null;
+
+// Get office_id from office name
+$office_id = null;
+if ($user_office && $conn) {
+    try {
+        $office_query = "SELECT id FROM offices WHERE office_name = ? OR office_code = ?";
+        $office_stmt = $conn->prepare($office_query);
+        $office_stmt->bind_param("ss", $user_office, $user_office);
+        $office_stmt->execute();
+        $office_result = $office_stmt->get_result();
+        
+        if ($office_row = $office_result->fetch_assoc()) {
+            $office_id = $office_row['id'];
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error getting office_id: " . $e->getMessage());
     }
-    $stmt->close();
-} catch (Exception $e) {
-    error_log("Error fetching assets: " . $e->getMessage());
 }
 
-// Get asset statistics
-$stats = [];
-try {
-    $office_id = $_SESSION['office_id'];
-    
-    // Total assets
-    $stmt = $conn->prepare("SELECT COUNT(*) as total_assets FROM asset_items WHERE office_id = ?");
-    $stmt->bind_param("i", $office_id);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $asset_stats = $result->fetch_assoc();
-    $stats['total_assets'] = $asset_stats['total_assets'];
-    $stmt->close();
-    
-    // Status distribution
-    $stmt = $conn->prepare("SELECT status, COUNT(*) as count FROM asset_items WHERE office_id = ? GROUP BY status");
-    $stmt->bind_param("i", $office_id);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $stats['status'] = [];
-    while ($row = $result->fetch_assoc()) {
-        $stats['status'][$row['status']] = $row['count'];
+if ($office_id && $conn) {
+    try {
+        // Fetch assets for this office
+        $query = "SELECT ai.*, ac.category_name, ac.category_code 
+                 FROM asset_items ai 
+                 LEFT JOIN asset_categories ac ON ai.asset_category_id = ac.id 
+                 WHERE ai.office_id = ? 
+                 ORDER BY ai.created_at DESC";
+        
+        $stmt = $conn->prepare($query);
+        $stmt->bind_param("i", $office_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        
+        while ($row = $result->fetch_assoc()) {
+            $assets[] = $row;
+            
+            // Calculate statistics
+            $stats['total_assets']++;
+            $stats['total_value'] += $row['value'] ?? 0;
+            
+            if ($row['status'] === 'maintenance' || $row['status'] === 'unserviceable') {
+                $stats['in_maintenance']++;
+            }
+            
+            if ($row['status'] === 'disposed') {
+                $stats['disposed']++;
+            }
+        }
+        
+    } catch (Exception $e) {
+        error_log("Error fetching assets: " . $e->getMessage());
     }
-    $stmt->close();
-    
-    // Total value
-    $stmt = $conn->prepare("SELECT SUM(value) as total_value FROM asset_items WHERE office_id = ?");
-    $stmt->bind_param("i", $office_id);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $value_stats = $result->fetch_assoc();
-    $stats['total_value'] = $value_stats['total_value'] ?? 0;
-    $stmt->close();
-    
-} catch (Exception $e) {
-    error_log("Error fetching asset stats: " . $e->getMessage());
 }
 ?>
 
@@ -112,6 +105,7 @@ try {
     <!-- Custom CSS -->
     <link href="../assets/css/index.css" rel="stylesheet">
     <link href="../assets/css/theme-custom.css" rel="stylesheet">
+    <link href="dashboard.css?v=<?php echo time(); ?>" rel="stylesheet">
     <style>
         body {
             font-family: 'Inter', sans-serif;
@@ -143,6 +137,34 @@ try {
             box-shadow: var(--shadow-lg);
         }
         
+        .type-badge {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.75rem;
+            border-radius: var(--border-radius-xl);
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        .type-electronics {
+            background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+            color: white;
+        }
+        
+        .type-furniture {
+            background: linear-gradient(135deg, #6f42c1 0%, #5a32a3 100%);
+            color: white;
+        }
+        
+        .type-vehicle {
+            background: linear-gradient(135deg, #28a745 0%, #1e7e34 100%);
+            color: white;
+        }
+        
+        .type-equipment {
+            background: linear-gradient(135deg, #fd7e14 0%, #dc6502 100%);
+            color: white;
+        }
+        
         .status-badge {
             font-size: 0.75rem;
             padding: 0.25rem 0.75rem;
@@ -155,28 +177,25 @@ try {
             color: white;
         }
         
-        .status-in_use {
-            background: linear-gradient(135deg, #191BA9 0%, #5CC2F2 100%);
-            color: white;
-        }
-        
         .status-maintenance {
-            background: linear-gradient(135deg, #ffc107 0%, #ff8c00 100%);
-            color: white;
+            background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%);
+            color: #212529;
         }
         
         .status-disposed {
-            background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
+            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
             color: white;
         }
         
-        .category-badge {
-            font-size: 0.75rem;
-            padding: 0.25rem 0.75rem;
-            border-radius: var(--border-radius-xl);
-            font-weight: 600;
-            background: linear-gradient(135deg, #5CC2F2 0%, #C1EAF2 100%);
-            color: var(--dark-color);
+        .action-btn {
+            padding: 0.375rem 0.75rem;
+            border-radius: var(--border-radius);
+            font-size: 0.875rem;
+            transition: var(--transition);
+        }
+        
+        .action-btn:hover {
+            transform: translateY(-1px);
         }
         
         .stats-card {
@@ -197,6 +216,20 @@ try {
             font-size: 2rem;
             font-weight: 700;
             color: var(--primary-color);
+        }
+        
+        .search-box {
+            background: white;
+            border: 2px solid var(--accent-color);
+            border-radius: var(--border-radius-lg);
+            padding: 0.75rem 1rem;
+            transition: var(--transition);
+        }
+        
+        .search-box:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 0.2rem rgba(25, 27, 169, 0.25);
+            outline: none;
         }
         
         .form-control {
@@ -242,16 +275,59 @@ try {
         .main-content::-webkit-scrollbar-thumb:hover {
             background: linear-gradient(135deg, #5CC2F2 0%, #191BA9 100%);
         }
+        
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .main-content {
+                padding: 1rem;
+                max-height: calc(100vh - 60px);
+            }
+            
+            .navbar-brand {
+                font-size: 1.2rem;
+            }
+        }
+        
+        /* Modal z-index fixes */
+        .modal {
+            z-index: 1055;
+        }
+        
+        .modal-backdrop {
+            z-index: 1050;
+        }
+        
+        .modal-dialog {
+            z-index: 1060;
+        }
+        
+        /* Ensure sidebar overlay doesn't interfere with modals */
+        .sidebar-overlay {
+            z-index: 1040;
+        }
+        
+        /* Fix modal backdrop issues */
+        .modal.show {
+            display: block !important;
+        }
+        
+        .modal-backdrop.show {
+            display: block !important;
+            opacity: 0.5;
+        }
+        
+        /* Ensure modal buttons are clickable */
+        .modal-footer button,
+        .modal-header button,
+        .modal-footer a {
+            z-index: 1061;
+            position: relative;
+        }
     </style>
 </head>
 <body>
-<?php
-// Set page title for topbar
-$page_title = 'Office Assets';
-?>
 <!-- Main Content Wrapper -->
     <div class="main-wrapper" id="mainWrapper">
-        <?php require_once 'includes/sidebar-toggle.php'; ?>
         <?php require_once 'includes/sidebar.php'; ?>
         <?php require_once 'includes/topbar.php'; ?>
     
@@ -264,29 +340,15 @@ $page_title = 'Office Assets';
                     <h1 class="mb-2">
                         <i class="bi bi-box-seam"></i> Office Assets
                     </h1>
-                    <p class="text-muted mb-0">Manage and monitor office assets and equipment</p>
+                    <p class="text-muted mb-0">Manage office assets, equipment, and inventory</p>
                 </div>
                 <div class="col-md-4 text-md-end">
-                    <div class="btn-group" role="group">
-                        <button class="btn btn-info btn-sm" onclick="exportAssets()">
-                            <i class="bi bi-download"></i> Export
-                        </button>
-                        <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addAssetModal">
-                            <i class="bi bi-plus-circle"></i> Add Asset
-                        </button>
-                    </div>
+                    <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addAssetModal">
+                        <i class="bi bi-plus-circle"></i> Add Asset
+                    </button>
                 </div>
             </div>
         </div>
-        
-        <!-- Message Display -->
-        <?php if (!empty($message)): ?>
-            <div class="alert alert-<?php echo $message_type; ?> alert-dismissible fade show" role="alert">
-                <i class="bi bi-<?php echo $message_type === 'success' ? 'check-circle' : 'exclamation-triangle'; ?>"></i>
-                <?php echo htmlspecialchars($message); ?>
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
-        <?php endif; ?>
         
         <!-- Asset Statistics -->
         <div class="row mb-4">
@@ -294,11 +356,11 @@ $page_title = 'Office Assets';
                 <div class="stats-card">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
-                            <div class="stats-number"><?php echo $stats['total_assets'] ?? 0; ?></div>
+                            <div class="stats-number"><?php echo $stats['total_assets']; ?></div>
                             <div class="text-muted">Total Assets</div>
                             <small class="text-success">
-                                <i class="bi bi-box"></i> 
-                                All Items
+                                <i class="bi bi-arrow-up"></i> 
+                                <?php echo $stats['total_assets'] - $stats['disposed']; ?> active
                             </small>
                         </div>
                         <div class="text-primary">
@@ -311,26 +373,12 @@ $page_title = 'Office Assets';
                 <div class="stats-card">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
-                            <div class="stats-number"><?php echo $stats['status']['available'] ?? 0; ?></div>
-                            <div class="text-muted">Available</div>
-                            <small class="text-success">Ready for Use</small>
-                        </div>
-                        <div class="text-success">
-                            <i class="bi bi-check-circle fs-1"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-lg-3 col-md-6">
-                <div class="stats-card">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <div class="stats-number"><?php echo $stats['status']['in_use'] ?? 0; ?></div>
-                            <div class="text-muted">In Use</div>
-                            <small class="text-info">Currently Assigned</small>
+                            <div class="stats-number">₱<?php echo number_format($stats['total_value'], 2); ?></div>
+                            <div class="text-muted">Total Value</div>
+                            <small class="text-info">Current Assets</small>
                         </div>
                         <div class="text-info">
-                            <i class="bi bi-person-check fs-1"></i>
+                            <i class="bi bi-currency-dollar fs-1"></i>
                         </div>
                     </div>
                 </div>
@@ -339,19 +387,33 @@ $page_title = 'Office Assets';
                 <div class="stats-card">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
-                            <div class="stats-number">₱<?php echo number_format($stats['total_value'] ?? 0, 2); ?></div>
-                            <div class="text-muted">Total Value</div>
-                            <small class="text-warning">Asset Worth</small>
+                            <div class="stats-number"><?php echo $stats['in_maintenance']; ?></div>
+                            <div class="text-muted">In Maintenance</div>
+                            <small class="text-warning">Under Repair</small>
                         </div>
                         <div class="text-warning">
-                            <i class="bi bi-currency-peso fs-1"></i>
+                            <i class="bi bi-tools fs-1"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-3 col-md-6">
+                <div class="stats-card">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="stats-number"><?php echo $stats['disposed']; ?></div>
+                            <div class="text-muted">Disposed</div>
+                            <small class="text-danger">Written Off</small>
+                        </div>
+                        <div class="text-danger">
+                            <i class="bi bi-trash fs-1"></i>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
         
-        <!-- Assets Table -->
+        <!-- Search and Filter -->
         <div class="row mb-4">
             <div class="col-12">
                 <div class="card border-0 shadow-lg rounded-4">
@@ -363,79 +425,28 @@ $page_title = 'Office Assets';
                             <table id="assetsTable" class="table table-hover">
                                 <thead>
                                     <tr>
-                                        <th>Asset Details</th>
+                                        <th>Asset</th>
                                         <th>Category</th>
                                         <th>Status</th>
-                                        <th>Assigned To</th>
                                         <th>Value</th>
-                                        <th>Last Updated</th>
+                                        <th>Acquisition Date</th>
                                         <th>Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <?php if (empty($assets)): ?>
+                                    <?php foreach ($assets as $asset): ?>
                                         <tr>
-                                            <td colspan="7" class="text-center py-5">
-                                                <i class="bi bi-box-seam fs-1 text-muted"></i>
-                                                <p class="text-muted mt-3">No assets found in this office</p>
+                                            <td><?php echo htmlspecialchars($asset['description']); ?></td>
+                                            <td><?php echo htmlspecialchars($asset['category_name'] ?? 'Uncategorized'); ?></td>
+                                            <td><?php echo ucfirst(str_replace('_', ' ', $asset['status'])); ?></td>
+                                            <td>₱<?php echo number_format($asset['value'] ?? 0, 2); ?></td>
+                                            <td><?php echo !empty($asset['acquisition_date']) ? date('M j, Y', strtotime($asset['acquisition_date'])) : 'Not set'; ?></td>
+                                            <td>
+                                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="editAsset(<?php echo $asset['id']; ?>)">Edit</button>
+                                                <button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteAsset(<?php echo $asset['id']; ?>)">Delete</button>
                                             </td>
                                         </tr>
-                                    <?php else: ?>
-                                        <?php foreach ($assets as $asset): ?>
-                                            <tr>
-                                                <td>
-                                                    <div class="d-flex align-items-center">
-                                                        <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px;">
-                                                            <i class="bi bi-box fs-5"></i>
-                                                        </div>
-                                                        <div>
-                                                            <div class="fw-semibold"><?php echo htmlspecialchars($asset['description']); ?></div>
-                                                            <small class="text-muted"><?php echo htmlspecialchars($asset['asset_description'] ?? 'N/A'); ?></small>
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td>
-                                                    <span class="category-badge">
-                                                        <?php echo htmlspecialchars($asset['category_name'] ?? 'Uncategorized'); ?>
-                                                    </span>
-                                                </td>
-                                                <td>
-                                                    <span class="status-badge status-<?php echo $asset['status']; ?>">
-                                                        <?php echo ucfirst(str_replace('_', ' ', $asset['status'])); ?>
-                                                    </span>
-                                                </td>
-                                                <td>
-                                                    <?php if ($asset['employee_id']): ?>
-                                                        <div>
-                                                            <div class="fw-semibold"><?php echo htmlspecialchars($asset['firstname'] . ' ' . $asset['lastname']); ?></div>
-                                                            <small class="text-muted"><?php echo htmlspecialchars($asset['end_user'] ?? 'N/A'); ?></small>
-                                                        </div>
-                                                    <?php else: ?>
-                                                        <span class="text-muted">Unassigned</span>
-                                                    <?php endif; ?>
-                                                </td>
-                                                <td>
-                                                    <strong>₱<?php echo number_format($asset['value'], 2); ?></strong>
-                                                </td>
-                                                <td>
-                                                    <small class="text-muted">
-                                                        <i class="bi bi-calendar"></i>
-                                                        <?php echo date('M j, Y', strtotime($asset['last_updated'])); ?>
-                                                    </small>
-                                                </td>
-                                                <td>
-                                                    <div class="btn-group" role="group">
-                                                        <button type="button" class="btn btn-sm btn-outline-primary action-btn" onclick="viewAsset(<?php echo $asset['id']; ?>)" title="View Details">
-                                                            <i class="bi bi-eye"></i>
-                                                        </button>
-                                                        <button type="button" class="btn btn-sm btn-outline-warning action-btn" onclick="editAsset(<?php echo $asset['id']; ?>)" title="Edit Asset">
-                                                            <i class="bi bi-pencil"></i>
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        <?php endforeach; ?>
-                                    <?php endif; ?>
+                                    <?php endforeach; ?>
                                 </tbody>
                             </table>
                         </div>
@@ -445,8 +456,8 @@ $page_title = 'Office Assets';
         </div>
     </div>
     
-    <?php require_once '../SYSTEM_ADMIN/includes/logout-modal.php'; ?>
-    <?php require_once '../SYSTEM_ADMIN/includes/change-password-modal.php'; ?>
+    <?php require_once 'includes/logout-modal.php'; ?>
+    <?php require_once 'includes/change-password-modal.php'; ?>
     
     <!-- Add Asset Modal -->
     <div class="modal fade" id="addAssetModal" tabindex="-1">
@@ -460,46 +471,64 @@ $page_title = 'Office Assets';
                     <input type="hidden" name="action" value="add_asset">
                     <div class="modal-body">
                         <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="asset_name" class="form-label">Asset Name</label>
+                                    <input type="text" class="form-control" id="asset_name" name="asset_name" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="asset_type" class="form-label">Asset Type</label>
+                                    <select class="form-control" id="asset_type" name="asset_type" required>
+                                        <option value="">Select Type</option>
+                                        <option value="electronics">Electronics</option>
+                                        <option value="furniture">Furniture</option>
+                                        <option value="vehicle">Vehicle</option>
+                                        <option value="equipment">Equipment</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
                             <div class="col-md-12">
                                 <div class="mb-3">
-                                    <label for="description" class="form-label">Asset Description</label>
-                                    <input type="text" class="form-control" id="description" name="description" required>
+                                    <label for="description" class="form-label">Description</label>
+                                    <textarea class="form-control" id="description" name="description" rows="3"></textarea>
                                 </div>
                             </div>
                         </div>
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="mb-3">
-                                    <label for="category" class="form-label">Category</label>
-                                    <select class="form-control" id="category" name="category" required>
-                                        <option value="">Select Category</option>
-                                        <?php
-                                        try {
-                                            $cat_stmt = $conn->prepare("SELECT id, name FROM asset_categories ORDER BY name");
-                                            $cat_stmt->execute();
-                                            $cat_result = $cat_stmt->get_result();
-                                            
-                                            while ($category = $cat_result->fetch_assoc()) {
-                                                echo "<option value='" . $category['id'] . "'>" . htmlspecialchars($category['name']) . "</option>";
-                                            }
-                                            $cat_stmt->close();
-                                        } catch (Exception $e) {
-                                            echo "<option value=''>Error loading categories</option>";
-                                        }
-                                        ?>
-                                    </select>
+                                    <label for="serial_number" class="form-label">Serial Number</label>
+                                    <input type="text" class="form-control" id="serial_number" name="serial_number">
                                 </div>
                             </div>
                             <div class="col-md-6">
                                 <div class="mb-3">
-                                    <label for="status" class="form-label">Status</label>
-                                    <select class="form-control" id="status" name="status" required>
-                                        <option value="">Select Status</option>
-                                        <option value="available">Available</option>
-                                        <option value="in_use">In Use</option>
-                                        <option value="maintenance">Maintenance</option>
-                                        <option value="disposed">Disposed</option>
-                                    </select>
+                                    <label for="location" class="form-label">Location</label>
+                                    <input type="text" class="form-control" id="location" name="location" required>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="purchase_date" class="form-label">Purchase Date</label>
+                                    <input type="date" class="form-control" id="purchase_date" name="purchase_date" required>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="purchase_cost" class="form-label">Purchase Cost (₱)</label>
+                                    <input type="number" class="form-control" id="purchase_cost" name="purchase_cost" step="0.01" min="0" required>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="current_value" class="form-label">Current Value (₱)</label>
+                                    <input type="number" class="form-control" id="current_value" name="current_value" step="0.01" min="0" required>
                                 </div>
                             </div>
                         </div>
@@ -512,22 +541,12 @@ $page_title = 'Office Assets';
                             </div>
                             <div class="col-md-6">
                                 <div class="mb-3">
-                                    <label for="value" class="form-label">Value (₱)</label>
-                                    <input type="number" class="form-control" id="value" name="value" step="0.01" min="0" required>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label for="unit" class="form-label">Unit</label>
-                                    <input type="text" class="form-control" id="unit" name="unit" placeholder="e.g., pcs, units, sets">
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label for="acquisition_date" class="form-label">Acquisition Date</label>
-                                    <input type="date" class="form-control" id="acquisition_date" name="acquisition_date">
+                                    <label for="status" class="form-label">Status</label>
+                                    <select class="form-control" id="status" name="status" required>
+                                        <option value="available">Available</option>
+                                        <option value="maintenance">Maintenance</option>
+                                        <option value="disposed">Disposed</option>
+                                    </select>
                                 </div>
                             </div>
                         </div>
@@ -542,7 +561,111 @@ $page_title = 'Office Assets';
             </div>
         </div>
     </div>
-
+    
+    <!-- Edit Asset Modal -->
+    <div class="modal fade" id="editAssetModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-warning text-dark">
+                    <h5 class="modal-title"><i class="bi bi-pencil"></i> Edit Asset</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST" action="" id="editAssetForm">
+                    <input type="hidden" name="action" value="edit_asset">
+                    <input type="hidden" name="asset_id" id="editAssetId">
+                    <div class="modal-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="edit_asset_name" class="form-label">Asset Name</label>
+                                    <input type="text" class="form-control" id="edit_asset_name" name="asset_name" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="edit_asset_type" class="form-label">Asset Type</label>
+                                    <select class="form-control" id="edit_asset_type" name="asset_type" required>
+                                        <option value="">Select Type</option>
+                                        <option value="electronics">Electronics</option>
+                                        <option value="furniture">Furniture</option>
+                                        <option value="vehicle">Vehicle</option>
+                                        <option value="equipment">Equipment</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-12">
+                                <div class="mb-3">
+                                    <label for="edit_description" class="form-label">Description</label>
+                                    <textarea class="form-control" id="edit_description" name="description" rows="3"></textarea>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="edit_serial_number" class="form-label">Serial Number</label>
+                                    <input type="text" class="form-control" id="edit_serial_number" name="serial_number">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="edit_location" class="form-label">Location</label>
+                                    <input type="text" class="form-control" id="edit_location" name="location" required>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="edit_purchase_date" class="form-label">Purchase Date</label>
+                                    <input type="date" class="form-control" id="edit_purchase_date" name="purchase_date" required>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="edit_purchase_cost" class="form-label">Purchase Cost (₱)</label>
+                                    <input type="number" class="form-control" id="edit_purchase_cost" name="purchase_cost" step="0.01" min="0" required>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="edit_current_value" class="form-label">Current Value (₱)</label>
+                                    <input type="number" class="form-control" id="edit_current_value" name="current_value" step="0.01" min="0" required>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="edit_quantity" class="form-label">Quantity</label>
+                                    <input type="number" class="form-control" id="edit_quantity" name="quantity" value="1" min="1" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="edit_status" class="form-label">Status</label>
+                                    <select class="form-control" id="edit_status" name="status" required>
+                                        <option value="available">Available</option>
+                                        <option value="maintenance">Maintenance</option>
+                                        <option value="disposed">Disposed</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-warning">
+                            <i class="bi bi-pencil"></i> Update Asset
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <!-- jQuery -->
@@ -557,11 +680,13 @@ $page_title = 'Office Assets';
                 responsive: true,
                 pageLength: 10,
                 lengthMenu: [[10, 25, 50, -1], [10, 25, 50, "All"]],
-                order: [[5, 'desc']], // Sort by last updated descending
+                order: [[4, 'desc']], // Sort by acquisition date descending
                 language: {
                     search: "Search assets:",
                     lengthMenu: "Show _MENU_ assets",
                     info: "Showing _START_ to _END_ of _TOTAL_ assets",
+                    emptyTable: "No assets found in your office",
+                    zeroRecords: "No matching assets found",
                     paginate: {
                         first: "First",
                         last: "Last",
@@ -572,31 +697,32 @@ $page_title = 'Office Assets';
             });
         });
         
-        // View asset details
-        function viewAsset(assetId) {
-            // For now, just show an alert. In a real implementation, 
-            // this would open a modal with asset details
-            alert('View asset details for ID: ' + assetId);
-        }
-        
-        // Edit asset
+        // Edit asset function
         function editAsset(assetId) {
-            // For now, just show an alert. In a real implementation,
-            // this would open an edit modal with asset data
-            alert('Edit asset with ID: ' + assetId);
+            // This will be implemented when backend is added
+            console.log('Edit asset:', assetId);
         }
         
-        // Export assets
-        function exportAssets() {
-            // For now, just show an alert. In a real implementation,
-            // this would generate and download an Excel/CSV file
-            alert('Export assets functionality would be implemented here');
+        // Delete asset function
+        function deleteAsset(assetId) {
+            if (confirm('Are you sure you want to delete this asset?')) {
+                // This will be implemented when backend is added
+                console.log('Delete asset:', assetId);
+            }
         }
         
         // Clear form on add modal close
         document.getElementById('addAssetModal').addEventListener('hidden.bs.modal', function () {
             this.querySelector('form').reset();
         });
+        
+        // Clear form on edit modal close
+        document.getElementById('editAssetModal').addEventListener('hidden.bs.modal', function () {
+            this.querySelector('form').reset();
+        });
     </script>
+    
+    <!-- Sidebar Scripts -->
+    <script src="../assets/js/sidebar.js"></script>
 </body>
 </html>

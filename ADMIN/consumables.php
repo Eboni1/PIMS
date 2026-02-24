@@ -218,15 +218,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['action']) && $_GET['acti
 
 // Handle filter parameters
 $office_filter = isset($_GET['office']) ? intval($_GET['office']) : 0;
+$for_office_filter = isset($_GET['for_office']) ? intval($_GET['for_office']) : 0;
 $search_filter = isset($_GET['search']) ? trim($_GET['search']) : '';
 
 // Get consumables with office information
 $consumables = [];
 try {
-    $sql = "SELECT c.*, o.office_name
+    $sql = "SELECT c.*, o.office_name, fo.office_name as for_office_name
             FROM consumables c 
             LEFT JOIN offices o ON c.office_id = o.id 
-            WHERE 1=1";
+            LEFT JOIN offices fo ON c.for_office_id = fo.id 
+            WHERE c.quantity > 0";
     
     $params = [];
     $types = '';
@@ -237,12 +239,19 @@ try {
         $types .= 'i';
     }
     
+    if ($for_office_filter > 0) {
+        $sql .= " AND c.for_office_id = ?";
+        $params[] = $for_office_filter;
+        $types .= 'i';
+    }
+    
     if (!empty($search_filter)) {
-        $sql .= " AND (c.description LIKE ? OR o.office_name LIKE ?)";
+        $sql .= " AND (c.description LIKE ? OR o.office_name LIKE ? OR fo.office_name LIKE ?)";
         $search_term = '%' . $search_filter . '%';
         $params[] = $search_term;
         $params[] = $search_term;
-        $types .= 'ss';
+        $params[] = $search_term;
+        $types .= 'sss';
     }
     
     $sql .= " ORDER BY c.created_at DESC";
@@ -439,6 +448,9 @@ try {
                     <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addConsumableModal">
                         <i class="bi bi-plus-circle"></i> Add Consumable
                     </button>
+                    <button class="btn btn-outline-info btn-sm ms-2" onclick="window.location.href='release_history.php'">
+                        <i class="bi bi-clock-history"></i> History
+                    </button>
                     <button class="btn btn-outline-success btn-sm ms-2" onclick="exportConsumables()">
                         <i class="bi bi-download"></i> Export
                     </button>
@@ -476,17 +488,27 @@ try {
         
         <!-- Consumables Table -->
         <div class="table-container">
-            <div class="row mb-3">
-                <div class="col-md-6">
+            <div class="row mb-3 align-items-center">
+                <div class="col-md-2">
                     <h5 class="mb-0"><i class="bi bi-list-ul"></i> Consumables List</h5>
                 </div>
-                <div class="col-md-6">
+                <div class="col-md-10">
                     <div class="row g-2">
-                        <div class="col-md-6">
+                        <div class="col-md-3">
                             <select class="form-select form-select-sm" id="officeFilter">
                                 <option value="">All Offices</option>
                                 <?php foreach ($offices as $office): ?>
                                     <option value="<?php echo $office['id']; ?>" <?php echo $office_filter == $office['id'] ? 'selected' : ''; ?>>
+                                        <?php echo htmlspecialchars($office['office_name']); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <select class="form-select form-select-sm" id="forOfficeFilter">
+                                <option value="">All For Offices</option>
+                                <?php foreach ($offices as $office): ?>
+                                    <option value="<?php echo $office['id']; ?>" <?php echo $for_office_filter == $office['id'] ? 'selected' : ''; ?>>
                                         <?php echo htmlspecialchars($office['office_name']); ?>
                                     </option>
                                 <?php endforeach; ?>
@@ -509,7 +531,7 @@ try {
                             <th>Total Value</th>
                             <th>Reorder Level</th>
                             <th>Office</th>
-                            <th>Created</th>
+                            <th>For Office</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
@@ -528,11 +550,20 @@ try {
                                     <td class="text-value"><?php echo number_format($consumable['quantity'] * $consumable['unit_cost'], 2); ?></td>
                                     <td><?php echo $consumable['reorder_level']; ?></td>
                                     <td><?php echo htmlspecialchars($consumable['office_name'] ?? 'N/A'); ?></td>
-                                    <td><small><?php echo date('M j, Y', strtotime($consumable['created_at'])); ?></small></td>
+                                    <td><?php echo htmlspecialchars($consumable['for_office_name'] ?? 'N/A'); ?></td>
                                     <td>
-                                        <button class="btn btn-sm btn-outline-warning" onclick="editReorderLevel(<?php echo $consumable['id']; ?>, '<?php echo htmlspecialchars($consumable['description']); ?>', <?php echo $consumable['quantity']; ?>)">
-                                            <i class="bi bi-pencil"></i> Edit Reorder
-                                        </button>
+                                        <?php if (empty($consumable['for_office_name'])): ?>
+                                            <button class="btn btn-sm btn-outline-info" disabled>
+                                                <i class="bi bi-check-circle"></i> Released
+                                            </button>
+                                        <?php else: ?>
+                                            <button class="btn btn-sm btn-outline-warning" onclick="editReorderLevel(<?php echo $consumable['id']; ?>, '<?php echo htmlspecialchars($consumable['description']); ?>', <?php echo $consumable['quantity']; ?>)">
+                                                <i class="bi bi-pencil"></i> Edit Reorder
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-success" onclick="openReleaseModal(<?php echo $consumable['id']; ?>)">
+                                                <i class="bi bi-box-arrow-right"></i> Release
+                                            </button>
+                                        <?php endif; ?>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
@@ -670,6 +701,21 @@ try {
         </div>
     </div>
     
+    <!-- Release Consumable Modal -->
+    <div class="modal fade" id="releaseConsumableModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-box-arrow-right"></i> Release Consumable</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <iframe id="releaseModalFrame" src="" style="width: 100%; height: 600px; border: none;"></iframe>
+                </div>
+            </div>
+        </div>
+    </div>
+    
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <!-- jQuery -->
@@ -713,6 +759,41 @@ try {
                 });
         }
         
+        // Open release modal function
+        function openReleaseModal(consumableId) {
+            const modal = new bootstrap.Modal(document.getElementById('releaseConsumableModal'));
+            document.getElementById('releaseModalFrame').src = 'release_consumable_modal.php?id=' + consumableId;
+            modal.show();
+        }
+        
+        // Close release modal function (called from iframe)
+        function closeReleaseModal() {
+            const modal = bootstrap.Modal.getInstance(document.getElementById('releaseConsumableModal'));
+            if (modal) {
+                modal.hide();
+            }
+        }
+        
+        // Show release success message (called from iframe)
+        function showReleaseSuccess(message) {
+            // Create success alert
+            const alertDiv = document.createElement('div');
+            alertDiv.className = 'alert alert-success alert-dismissible fade show position-fixed';
+            alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+            alertDiv.innerHTML = `
+                <i class="bi bi-check-circle"></i> ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            document.body.appendChild(alertDiv);
+            
+            // Auto-remove after 5 seconds
+            setTimeout(() => {
+                if (alertDiv.parentNode) {
+                    alertDiv.parentNode.removeChild(alertDiv);
+                }
+            }, 5000);
+        }
+        
         // Initialize DataTable
         let consumablesTable;
         
@@ -721,6 +802,27 @@ try {
             // we don't need to initialize DataTables
             // The table will be rendered by PHP with proper filtering
             consumablesTable = null;
+            
+            // Preserve other URL parameters function
+            function preserveOtherParams(currentUrl) {
+                // Preserve search parameter
+                const searchValue = currentUrl.searchParams.get('search');
+                if (!searchValue) {
+                    currentUrl.searchParams.delete('search');
+                }
+                
+                // Preserve office parameter
+                const officeValue = currentUrl.searchParams.get('office');
+                if (!officeValue) {
+                    currentUrl.searchParams.delete('office');
+                }
+                
+                // Preserve for_office parameter
+                const forOfficeValue = currentUrl.searchParams.get('for_office');
+                if (!forOfficeValue) {
+                    currentUrl.searchParams.delete('for_office');
+                }
+            }
             
             // Office filter
             $('#officeFilter').on('change', function() {
@@ -731,11 +833,22 @@ try {
                 } else {
                     currentUrl.searchParams.delete('office');
                 }
-                // Preserve search parameter if exists
-                const searchValue = currentUrl.searchParams.get('search');
-                if (!searchValue) {
-                    currentUrl.searchParams.delete('search');
+                // Preserve other parameters
+                preserveOtherParams(currentUrl);
+                window.location.href = currentUrl.toString();
+            });
+            
+            // For Office filter
+            $('#forOfficeFilter').on('change', function() {
+                const forOfficeValue = this.value;
+                const currentUrl = new URL(window.location);
+                if (forOfficeValue) {
+                    currentUrl.searchParams.set('for_office', forOfficeValue);
+                } else {
+                    currentUrl.searchParams.delete('for_office');
                 }
+                // Preserve other parameters
+                preserveOtherParams(currentUrl);
                 window.location.href = currentUrl.toString();
             });
             
@@ -752,11 +865,8 @@ try {
                     } else {
                         currentUrl.searchParams.delete('search');
                     }
-                    // Preserve office parameter if exists
-                    const officeValue = currentUrl.searchParams.get('office');
-                    if (!officeValue) {
-                        currentUrl.searchParams.delete('office');
-                    }
+                    // Preserve other parameters
+                    preserveOtherParams(currentUrl);
                     window.location.href = currentUrl.toString();
                 }, 500); // Wait 500ms after user stops typing
             });
@@ -767,11 +877,11 @@ try {
             // Get current table data from DOM
             const table = document.getElementById('consumablesTable');
             const rows = table.getElementsByTagName('tbody')[0].getElementsByTagName('tr');
-            let csv = 'Description,Quantity,Unit Cost,Total Value,Reorder Level,Office,Created\n';
+            let csv = 'Description,Quantity,Unit Cost,Total Value,Reorder Level,Office,For Office\n';
             
             for (let i = 0; i < rows.length; i++) {
                 const cells = rows[i].getElementsByTagName('td');
-                if (cells.length === 8) { // Skip empty message row
+                if (cells.length === 9) { // Skip empty message row
                     const rowData = [
                         cells[0].textContent.replace(/\s+/g, ' ').trim(), // Description
                         cells[1].textContent.trim(), // Quantity
@@ -779,7 +889,7 @@ try {
                         cells[3].textContent.replace(/[^0-9.-]+/g, '').trim(), // Total Value
                         cells[4].textContent.trim(), // Reorder Level
                         cells[5].textContent.trim(), // Office
-                        cells[6].textContent.trim()  // Created
+                        cells[6].textContent.trim()  // For Office
                     ];
                     csv += rowData.map(cell => `"${cell}"`).join(',') + '\n';
                 }

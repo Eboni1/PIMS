@@ -22,12 +22,40 @@ if (!in_array($_SESSION['role'], ['admin', 'system_admin'])) {
 // Log page access
 logSystemAction($_SESSION['user_id'], 'Accessed Property Acknowledgment Receipt Form', 'forms', 'par_form.php');
 
-// Get next PAR number - COMMENTED OUT FOR MANUAL INPUT
-// $next_par_no = getNextTagPreview('par_no');
-// if ($next_par_no === null) {
-//     $next_par_no = ''; // Fallback if no configuration exists
-// }
-$next_par_no = ''; // Empty for manual input
+// Get data for dropdowns
+$funds_result = $conn->query("SELECT fund_code, fund_name, fund_cluster FROM funds WHERE status = 'active' ORDER BY fund_code");
+$categories_result = $conn->query("SELECT category_code, category_name FROM asset_categories WHERE status = 'active' ORDER BY category_code");
+$subcategories_result = $conn->query("SELECT sc.sub_category_code, sc.sub_category_name, ac.category_code FROM asset_sub_categories sc JOIN asset_categories ac ON sc.asset_categories_id = ac.id WHERE sc.status = 'active' ORDER BY ac.category_code, sc.sub_category_code");
+$offices_result = $conn->query("SELECT office_code, office_name FROM offices WHERE status = 'active' ORDER BY office_code");
+
+// Get next PAR series number
+$next_par_series = '0001';
+$result = $conn->query("SELECT MAX(CAST(SUBSTRING(par_no, -4, 4) AS UNSIGNED)) as max_series FROM par_forms WHERE par_no LIKE '%P-%' AND par_no REGEXP 'P-[0-9]{4}-[0-9]{2}-[0-9]{4}$'");
+if ($result && $row = $result->fetch_assoc()) {
+    $max_series = $row['max_series'];
+    if ($max_series) {
+        $next_par_series = str_pad($max_series + 1, 4, '0', STR_PAD_LEFT);
+    }
+}
+
+// Get next series number for auto-increment
+$next_series = '01';
+$result = $conn->query("SELECT MAX(CAST(SUBSTRING(property_number, -4, 2) AS UNSIGNED)) as max_series FROM asset_items WHERE property_number LIKE CONCAT(YEAR(CURDATE()), '-%')");
+if ($result && $row = $result->fetch_assoc()) {
+    $max_series = $row['max_series'];
+    if ($max_series) {
+        $next_series = str_pad($max_series + 1, 2, '0', STR_PAD_LEFT);
+    }
+}
+
+// Form type options with codes
+$form_options = [
+    'PAR' => ['code' => '07', 'name' => 'Property Acknowledgment Receipt'],
+    'ICS' => ['code' => '04', 'name' => 'Inventory Custodian Slip'],
+    'RIS' => ['code' => '02', 'name' => 'Requisition and Issue Slip'],
+    'IIRUP' => ['code' => '06', 'name' => 'Inventory and Inspection Report'],
+    'ITR' => ['code' => '08', 'name' => 'Inventory Transfer Request']
+];
 
 // Get PAR configuration for JavaScript - COMMENTED OUT FOR MANUAL INPUT
 // $par_config = null;
@@ -221,6 +249,36 @@ if ($result && $row = $result->fetch_assoc()) {
             .no-print { display: none !important; }
             .form-card { box-shadow: none; }
         }
+        
+        .property-number-field {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .property-number-field input {
+            flex: 1;
+        }
+        
+        .property-number-field .btn {
+            flex-shrink: 0;
+        }
+        
+        .generator-modal .form-label {
+            font-weight: 600;
+            color: #495057;
+        }
+        
+        .generator-modal .card {
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+        }
+        
+        .generator-modal #propertyNumberPreview {
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
     </style>
 </head>
 <body>
@@ -300,10 +358,10 @@ if ($result && $row = $result->fetch_assoc()) {
                                             <option value="">Select Office</option>
                                             <?php
                                             // Get offices from database
-                                            $offices_result = $conn->query("SELECT id, office_name FROM offices WHERE status = 'active' ORDER BY office_name");
+                                            $offices_result = $conn->query("SELECT office_code, office_name FROM offices WHERE status = 'active' ORDER BY office_code");
                                             if ($offices_result) {
                                                 while ($office = $offices_result->fetch_assoc()) {
-                                                    echo '<option value="' . htmlspecialchars($office['office_name']) . '">' . htmlspecialchars($office['office_name']) . '</option>';
+                                                    echo '<option value="' . htmlspecialchars($office['office_code']) . '">' . htmlspecialchars($office['office_name']) . '</option>';
                                                 }
                                             }
                                             ?>
@@ -325,8 +383,8 @@ if ($result && $row = $result->fetch_assoc()) {
                             </div>
                             <div class="col-md-4">
                                 <label class="form-label"><strong>PAR No:</strong></label>
-                                <input type="text" class="form-control" name="par_no" id="par_no" value="" placeholder="Enter PAR number manually">
-                                <small class="text-muted">Enter PAR number manually.</small>
+                                <input type="text" class="form-control" name="par_no" id="par_no" value="" readonly placeholder="Auto-generated when office is selected">
+                                <small class="text-muted">Format: OfficeP-Year-Month-Series (e.g., OMMP-2026-02-0001)</small>
                             </div>
                         </div>
                         
@@ -358,12 +416,27 @@ if ($result && $row = $result->fetch_assoc()) {
                                                 </select>
                                             </td>
                                             <td><input type="text" class="form-control form-control-sm" name="description[]" required></td>
-                                            <td><input type="text" class="form-control form-control-sm" name="property_number[]" id="initialPropertyNumber" value="" placeholder="Enter property number manually"></td>
+                                            <td>
+                                                <div class="property-number-field">
+                                                    <input type="text" class="form-control form-control-sm" name="property_number[]" id="initialPropertyNumber" value="" readonly placeholder="Click 'Generate' to create property number">
+                                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="showPropertyNumberGenerator(this)" title="Generate Property Number">
+                                                        <i class="bi bi-gear"></i> Generate
+                                                    </button>
+                                                </div>
+                                                <small class="text-muted">Format: YEAR-FORM-FUND-CATEGORY-SUBCATEGORY+SERIES-OFFICE</small>
+                                            </td>
                                             <td><input type="date" class="form-control form-control-sm" name="date_acquired[]"></td>
-                                            <td><input type="number" step="0.01" class="form-control form-control-sm" name="amount[]" required></td>
+                                            <td><input type="number" step="0.01" class="form-control form-control-sm" name="amount[]" required onchange="updateGrandTotal()"></td>
                                             <td><button type="button" class="btn btn-sm btn-danger" onclick="removeRow(this)"><i class="bi bi-trash"></i></button></td>
                                         </tr>
                                     </tbody>
+                                    <tfoot>
+                                        <tr class="table-primary fw-bold">
+                                            <td colspan="5" class="text-end">Grand Total:</td>
+                                            <td id="grandTotal">0.00</td>
+                                            <td></td>
+                                        </tr>
+                                    </tfoot>
                                 </table>
                             </div>
                             <button type="button" class="btn btn-sm btn-secondary" onclick="addRow()">
@@ -404,6 +477,130 @@ if ($result && $row = $result->fetch_assoc()) {
 
     <?php include 'includes/logout-modal.php'; ?>
     <?php include 'includes/change-password-modal.php'; ?>
+    
+    <!-- Property Number Generator Modal -->
+    <div class="modal fade generator-modal" id="propertyNumberGeneratorModal" tabindex="-1" aria-labelledby="propertyNumberGeneratorModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="propertyNumberGeneratorModalLabel">
+                        <i class="bi bi-gear"></i> Property Number Generator
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info" id="quantityInfo">
+                        <i class="bi bi-info-circle"></i> <span id="quantityText">Generating 1 property number</span>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <label class="form-label"><strong>Form Type:</strong></label>
+                            <input type="text" class="form-control" id="formType" value="07" readonly>
+                            <small class="text-muted">Auto-detected: Property Acknowledgment Receipt</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label"><strong>Fund:</strong></label>
+                            <select class="form-select" id="fundSelect">
+                                <option value="">Select Fund</option>
+                                <?php 
+                                if ($funds_result) {
+                                    // Reset pointer to beginning
+                                    $funds_result->data_seek(0);
+                                    while ($fund = $funds_result->fetch_assoc()) {
+                                        // Extract numeric part from fund code (e.g., "05" from "GEN-2025")
+                                        preg_match('/(\d{2})$/', $fund['fund_code'], $matches);
+                                        $fund_code = isset($matches[1]) ? $matches[1] : '05';
+                                        echo '<option value="' . $fund_code . '">' . htmlspecialchars($fund['fund_name']) . ' (' . htmlspecialchars($fund['fund_code']) . ')</option>';
+                                    }
+                                }
+                                ?>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <label class="form-label"><strong>Asset Category:</strong></label>
+                            <select class="form-select" id="categorySelect">
+                                <option value="">Select Category</option>
+                                <?php 
+                                if ($categories_result) {
+                                    while ($category = $categories_result->fetch_assoc()) {
+                                        echo '<option value="' . htmlspecialchars($category['category_code']) . '">' . htmlspecialchars($category['category_name']) . '</option>';
+                                    }
+                                }
+                                ?>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label"><strong>Asset Subcategory:</strong></label>
+                            <select class="form-select" id="subcategorySelect">
+                                <option value="">Select Subcategory</option>
+                                <?php 
+                                if ($subcategories_result) {
+                                    while ($subcategory = $subcategories_result->fetch_assoc()) {
+                                        echo '<option value="' . htmlspecialchars($subcategory['sub_category_code']) . '" data-category="' . htmlspecialchars($subcategory['category_code']) . '">' . htmlspecialchars($subcategory['sub_category_name']) . '</option>';
+                                    }
+                                }
+                                ?>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <label class="form-label"><strong>Series (Auto-increment):</strong></label>
+                            <input type="text" class="form-control" id="seriesInput" value="<?php echo $next_series; ?>" readonly>
+                            <small class="text-muted">Auto-generated next available series number</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label"><strong>Office:</strong></label>
+                            <select class="form-select" id="officeSelect">
+                                <option value="">Select Office</option>
+                                <?php 
+                                if ($offices_result) {
+                                    // Reset pointer to beginning
+                                    $offices_result->data_seek(0);
+                                    while ($office = $offices_result->fetch_assoc()) {
+                                        $selected = ($office['office_code'] == '01') ? 'selected' : '';
+                                        echo '<option value="' . htmlspecialchars($office['office_code']) . '" ' . $selected . '>' . htmlspecialchars($office['office_name']) . ' (' . htmlspecialchars($office['office_code']) . ')</option>';
+                                    }
+                                }
+                                ?>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-4">
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0"><i class="bi bi-eye"></i> Preview</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-8">
+                                        <h4 id="propertyNumberPreview" class="text-primary mb-0">-</h4>
+                                    </div>
+                                    <div class="col-md-4 text-end">
+                                        <button type="button" class="btn btn-success" onclick="generatePropertyNumberPreview()">
+                                            <i class="bi bi-arrow-clockwise"></i> Generate
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="applyPropertyNumber()">
+                        <i class="bi bi-check-circle"></i> Apply Property Number
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
     <?php include 'includes/sidebar-scripts.php'; ?>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
@@ -470,16 +667,23 @@ if ($result && $row = $result->fetch_assoc()) {
                 '<input type="number" class="form-control form-control-sm" name="quantity[]" required onchange="calculateAmount(this)">',
                 '<select class="form-select form-select-sm" name="unit[]" required>' + unitOptions + '</select>',
                 '<input type="text" class="form-control form-control-sm" name="description[]" required>',
-                '<input type="text" class="form-control form-control-sm" name="property_number[]" value="' + autoPropertyNumber + '" placeholder="Enter property number manually">',
+                '<div class="property-number-field">' +
+                '<input type="text" class="form-control form-control-sm" name="property_number[]" value="" readonly placeholder="Click Generate to create">' +
+                '<button type="button" class="btn btn-sm btn-outline-primary" onclick="showPropertyNumberGenerator(this)" title="Generate Property Number"><i class="bi bi-gear"></i> Generate</button>' +
+                '</div>' +
+                '<small class="text-muted">Format: YEAR-FORM-FUND-CATEGORY-SUBCATEGORY+SERIES-OFFICE</small>',
                 '<input type="date" class="form-control form-control-sm" name="date_acquired[]">',
-                '<input type="number" step="0.01" class="form-control form-control-sm" name="amount[]" required>',
+                '<input type="number" step="0.01" class="form-control form-control-sm" name="amount[]" required onchange="updateGrandTotal()">',
                 '<button type="button" class="btn btn-sm btn-danger" onclick="removeRow(this)"><i class="bi bi-trash"></i></button>'
             ];
             
-            cells.forEach((cellHtml, index) => {
-                const cell = newRow.insertCell(index);
-                cell.innerHTML = cellHtml;
-            });
+            for (let i = 0; i < cells.length; i++) {
+                const cell = newRow.insertCell(i);
+                cell.innerHTML = cells[i];
+            }
+            
+            // Add amount listeners to the new row
+            addAmountListeners();
         }
         
         // Initialize the form with auto-generated property numbers - COMMENTED OUT FOR MANUAL INPUT
@@ -495,6 +699,8 @@ if ($result && $row = $result->fetch_assoc()) {
         // Initialize when document is ready
         document.addEventListener('DOMContentLoaded', function() {
             initializeForm();
+            addAmountListeners();
+            updateGrandTotal(); // Initialize grand total
         });
         
         function removeRow(button) {
@@ -503,25 +709,107 @@ if ($result && $row = $result->fetch_assoc()) {
             
             if (table.rows.length > 1) {
                 row.remove();
+                // Update grand total after removing row
+                updateGrandTotal();
             } else {
                 alert('At least one row is required');
             }
         }
         
-        function calculateAmount(input) {
-            // Since amount is now directly entered, we don't need to calculate it
-            // This function can be used for validation if needed
-            const row = input.closest('tr');
-            const quantity = row.querySelector('input[name="quantity[]"]').value || 0;
-            const amount = row.querySelector('input[name="amount[]"]').value || 0;
+        function updateGrandTotal() {
+            const table = document.getElementById('itemsTable').getElementsByTagName('tbody')[0];
+            const rows = table.getElementsByTagName('tr');
+            let grandTotal = 0;
             
-            // Optional: Validate that amount is reasonable
-            if (parseFloat(quantity) < 0) {
-                row.querySelector('input[name="quantity[]"]').value = 0;
+            for (let i = 0; i < rows.length; i++) {
+                const row = rows[i];
+                const quantityInput = row.querySelector('input[name="quantity[]"]');
+                const amountInput = row.querySelector('input[name="amount[]"]');
+                
+                if (quantityInput && amountInput) {
+                    const quantity = parseFloat(quantityInput.value) || 0;
+                    const amount = parseFloat(amountInput.value) || 0;
+                    const rowTotal = quantity * amount;
+                    grandTotal += rowTotal;
+                }
             }
-            if (parseFloat(amount) < 0) {
-                row.querySelector('input[name="amount[]"]').value = 0;
+            
+            // Update the grand total display
+            const grandTotalElement = document.getElementById('grandTotal');
+            if (grandTotalElement) {
+                grandTotalElement.textContent = grandTotal.toFixed(2);
             }
+        }
+        
+        function calculateAmount(input) {
+            // This function is called when quantity changes
+            // Update grand total since quantity affects the total
+            updateGrandTotal();
+            
+            // Optional: Validate that quantity is reasonable
+            const quantity = parseFloat(input.value) || 0;
+            if (quantity < 0) {
+                input.value = 0;
+            }
+        }
+        
+        // Function to format amount with .00
+        function formatAmount(input) {
+            let value = input.value.replace(/[^\d.]/g, '');
+            
+            // Remove multiple decimal points
+            const parts = value.split('.');
+            if (parts.length > 2) {
+                value = parts[0] + '.' + parts.slice(1).join('');
+            }
+            
+            // Format to 2 decimal places
+            if (value && !isNaN(value)) {
+                const numValue = parseFloat(value);
+                input.value = numValue.toFixed(2);
+            } else if (value === '') {
+                input.value = '';
+            }
+        }
+        
+        // Add event listeners to amount inputs
+        function addAmountListeners() {
+            const amountInputs = document.querySelectorAll('input[name="amount[]"]');
+            amountInputs.forEach(input => {
+                // Format on blur (when leaving the field)
+                input.addEventListener('blur', function() {
+                    formatAmount(this);
+                    updateGrandTotal();
+                });
+                
+                // Format on change
+                input.addEventListener('change', function() {
+                    formatAmount(this);
+                    updateGrandTotal();
+                });
+                
+                // Allow only numbers and decimal point during typing
+                input.addEventListener('input', function(e) {
+                    let value = e.target.value;
+                    // Allow only digits and one decimal point
+                    const cursorPos = e.target.selectionStart;
+                    const beforeCursor = value.substring(0, cursorPos);
+                    const afterCursor = value.substring(cursorPos);
+                    
+                    // Count decimal points before cursor
+                    const decimalPointsBefore = (beforeCursor.match(/\./g) || []).length;
+                    
+                    // If this is a decimal point and there's already one, prevent it
+                    if (e.data === '.' && decimalPointsBefore >= 1) {
+                        e.preventDefault();
+                        return;
+                    }
+                    
+                    // Remove non-numeric characters except decimal point
+                    value = value.replace(/[^\d.]/g, '');
+                    e.target.value = value;
+                });
+            });
         }
         
         function resetForm() {
@@ -531,6 +819,11 @@ if ($result && $row = $result->fetch_assoc()) {
                 const table = document.getElementById('itemsTable').getElementsByTagName('tbody')[0];
                 while (table.rows.length > 1) {
                     table.deleteRow(1);
+                }
+                // Reset grand total
+                const grandTotalElement = document.getElementById('grandTotal');
+                if (grandTotalElement) {
+                    grandTotalElement.textContent = '0.00';
                 }
             }
         }
@@ -587,6 +880,241 @@ if ($result && $row = $result->fetch_assoc()) {
             // this.appendChild(incrementField);
             
             // No counter increment needed for manual input
+        });
+        
+        // Property Number Generator Functions
+        let currentPropertyField = null;
+        let lastUsedSeries = 1; // Track the last used series number globally
+        
+        function showPropertyNumberGenerator(button) {
+            currentPropertyField = button.closest('td').querySelector('input[name="property_number[]"], textarea[name="property_number[]"]');
+            const row = button.closest('tr');
+            const quantityInput = row.querySelector('input[name="quantity[]"]');
+            const quantity = parseInt(quantityInput.value) || 1;
+            
+            const modal = new bootstrap.Modal(document.getElementById('propertyNumberGeneratorModal'));
+            modal.show();
+            
+            // Store quantity in a global variable instead of modal dataset
+            window.currentQuantity = quantity;
+            
+            // Update quantity display
+            const quantityText = document.getElementById('quantityText');
+            if (quantity === 1) {
+                quantityText.textContent = 'Generating 1 property number';
+            } else {
+                quantityText.textContent = `Generating ${quantity} property numbers`;
+            }
+            
+            // Clear previous values (except series)
+            clearGeneratorForm();
+            
+            // Get next available series number dynamically
+            getNextSeriesNumber();
+            
+            // Auto-generate initial preview
+            setTimeout(() => {
+                generatePropertyNumberPreview();
+            }, 100);
+        }
+        
+        function getNextSeriesNumber() {
+            fetch('../api/get_next_series.php', {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.next_series) {
+                    document.getElementById('seriesInput').value = data.next_series;
+                    generatePropertyNumberPreview();
+                }
+            })
+            .catch(error => {
+                console.error('Error getting next series number:', error);
+                // Use fallback value from PHP
+                generatePropertyNumberPreview();
+            });
+        }
+        
+        function clearGeneratorForm() {
+            document.getElementById('fundSelect').value = '';
+            document.getElementById('categorySelect').value = '';
+            document.getElementById('subcategorySelect').value = '';
+            // Don't clear series - it's auto-incremented
+            // Don't clear office - keep default selection
+            // Don't clear formType - it's auto-detected and readonly
+            document.getElementById('propertyNumberPreview').textContent = '-';
+            document.getElementById('propertyNumberPreview').style.fontSize = '';
+            document.getElementById('propertyNumberPreview').style.lineHeight = '';
+        }
+        
+        function generatePropertyNumberPreview() {
+            const year = new Date().getFullYear();
+            const formType = document.getElementById('formType').value || '07';
+            const fund = document.getElementById('fundSelect').value || '05';
+            const category = document.getElementById('categorySelect').value || '030';
+            const subcategory = document.getElementById('subcategorySelect').value || '01';
+            const baseSeries = document.getElementById('seriesInput').value || '<?php echo $next_series; ?>';
+            const office = document.getElementById('officeSelect').value || '01';
+            
+            // Get quantity from global variable
+            const quantity = window.currentQuantity || 1;
+            
+            // Generate multiple property numbers using the global lastUsedSeries
+            const propertyNumbers = [];
+            for (let i = 0; i < quantity; i++) {
+                // Use the global lastUsedSeries to continue incrementing
+                const currentSeriesNumber = lastUsedSeries + i;
+                const currentSubcategorySeries = String(currentSeriesNumber).padStart(4, '0');
+                
+                const propertyNumber = `${year}-${formType}-${fund}-${category}-${currentSubcategorySeries}-${office}`;
+                propertyNumbers.push(propertyNumber);
+            }
+            
+            // Display in preview
+            const previewElement = document.getElementById('propertyNumberPreview');
+            if (quantity === 1) {
+                previewElement.textContent = propertyNumbers[0];
+            } else {
+                previewElement.innerHTML = propertyNumbers.join('<br>');
+                previewElement.style.fontSize = '14px';
+                previewElement.style.lineHeight = '1.4';
+            }
+        }
+        
+        function applyPropertyNumber() {
+            const previewElement = document.getElementById('propertyNumberPreview');
+            const propertyNumbers = previewElement.innerHTML.split('<br>').filter(num => num.trim());
+            
+            if (propertyNumbers.length === 0 || propertyNumbers[0] === '-') {
+                alert('Please generate a property number first.');
+                return;
+            }
+            
+            if (currentPropertyField && propertyNumbers.length > 0) {
+                if (propertyNumbers.length === 1) {
+                    // Single property number - keep as input
+                    currentPropertyField.value = propertyNumbers[0];
+                    currentPropertyField.style.height = 'auto';
+                    
+                    // Update lastUsedSeries
+                    const propNumParts = propertyNumbers[0].split('-');
+                    const seriesPart = propNumParts[4]; // Get the series part (0101, 0102, etc.)
+                    lastUsedSeries = parseInt(seriesPart) + 1;
+                } else {
+                    // Multiple property numbers - create a textarea for multi-line display
+                    const textarea = document.createElement('textarea');
+                    textarea.className = 'form-control form-control-sm';
+                    textarea.name = 'property_number[]';
+                    textarea.value = propertyNumbers.join('\n');
+                    textarea.style.height = (propertyNumbers.length * 30) + 'px';
+                    textarea.style.minHeight = '60px';
+                    textarea.style.resize = 'vertical';
+                    textarea.readOnly = true;
+                    
+                    // Replace the input with textarea
+                    const propertyNumberContainer = currentPropertyField.closest('.property-number-field');
+                    const inputContainer = propertyNumberContainer.querySelector('input[name="property_number[]"], textarea[name="property_number[]"]');
+                    inputContainer.parentNode.replaceChild(textarea, inputContainer);
+                    
+                    // Add the generate button and format text if not present
+                    if (!propertyNumberContainer.querySelector('button')) {
+                        propertyNumberContainer.innerHTML += 
+                            '<button type="button" class="btn btn-sm btn-outline-primary" onclick="showPropertyNumberGenerator(this)" title="Generate Property Number"><i class="bi bi-gear"></i> Generate</button>';
+                    }
+                    
+                    if (!propertyNumberContainer.nextElementSibling || !propertyNumberContainer.nextElementSibling.classList.contains('text-muted')) {
+                        const formatText = document.createElement('small');
+                        formatText.className = 'text-muted d-block mt-1';
+                        formatText.textContent = 'Format: YEAR-FORM-FUND-CATEGORY-SUBCATEGORY+SERIES-OFFICE';
+                        propertyNumberContainer.parentNode.insertBefore(formatText, propertyNumberContainer.nextSibling);
+                    }
+                    
+                    // Update lastUsedSeries to the next number after the last one
+                    const lastPropNumParts = propertyNumbers[propertyNumbers.length - 1].split('-');
+                    const lastSeriesPart = lastPropNumParts[4]; // Get the series part of the last property number
+                    lastUsedSeries = parseInt(lastSeriesPart) + 1;
+                }
+                
+                // Close modal
+                const modal = bootstrap.Modal.getInstance(document.getElementById('propertyNumberGeneratorModal'));
+                modal.hide();
+            }
+        }
+        
+        // Auto-generate PAR number when office location is selected
+        function generatePARNumber() {
+            const officeSelect = document.querySelector('select[name="office_location"]');
+            const parNoField = document.getElementById('par_no');
+            
+            if (officeSelect.value && parNoField) {
+                // Get selected office name from option text
+                const selectedOption = officeSelect.options[officeSelect.selectedIndex];
+                const officeName = selectedOption.text.trim();
+                
+                // Get current year
+                const currentYear = new Date().getFullYear();
+                
+                // Get current month (2 digits)
+                const currentMonth = String(new Date().getMonth() + 1).padStart(2, '0');
+                
+                // Get next series from PHP
+                const nextSeries = '<?php echo $next_par_series; ?>';
+                
+                // Generate PAR number: OfficeP-Year-Month-Series
+                const parNumber = `${officeName}P-${currentYear}-${currentMonth}-${nextSeries}`;
+                
+                parNoField.value = parNumber;
+            } else {
+                parNoField.value = '';
+            }
+        }
+        
+        // Add event listener to office location dropdown
+        document.addEventListener('DOMContentLoaded', function() {
+            const officeSelect = document.querySelector('select[name="office_location"]');
+            if (officeSelect) {
+                officeSelect.addEventListener('change', generatePARNumber);
+            }
+        });
+        
+        // Auto-update preview when any field changes
+        document.addEventListener('DOMContentLoaded', function() {
+            // Add event listeners for auto-preview
+            const fields = ['fundSelect', 'categorySelect', 'subcategorySelect', 'officeSelect'];
+            fields.forEach(fieldId => {
+                const element = document.getElementById(fieldId);
+                if (element) {
+                    element.addEventListener('change', generatePropertyNumberPreview);
+                    element.addEventListener('input', generatePropertyNumberPreview);
+                }
+            });
+            
+            // Filter subcategories based on category selection
+            document.getElementById('categorySelect').addEventListener('change', function() {
+                const selectedCategory = this.value;
+                const subcategorySelect = document.getElementById('subcategorySelect');
+                const options = subcategorySelect.querySelectorAll('option');
+                
+                options.forEach(option => {
+                    if (option.value === '') {
+                        option.style.display = 'block';
+                    } else {
+                        const optionCategory = option.getAttribute('data-category');
+                        option.style.display = (optionCategory === selectedCategory || selectedCategory === '') ? 'block' : 'none';
+                    }
+                });
+                
+                // Reset subcategory if it doesn't match the new category
+                if (subcategorySelect.value && subcategorySelect.options[subcategorySelect.selectedIndex].getAttribute('data-category') !== selectedCategory) {
+                    subcategorySelect.value = '';
+                }
+                
+                generatePropertyNumberPreview();
+            });
         });
     </script>
 </body>

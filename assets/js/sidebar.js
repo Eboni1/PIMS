@@ -15,7 +15,10 @@ document.addEventListener('DOMContentLoaded', function() {
         
         if (isOpen) {
             sidebar.classList.remove('show');
-            sidebarOverlay.classList.remove('show');
+            // Only hide overlay on mobile/tablet
+            if (window.innerWidth <= 1024) {
+                sidebarOverlay.classList.remove('show');
+            }
             // Update both toggle buttons
             document.querySelectorAll('.sidebar-toggle').forEach(btn => {
                 btn.classList.remove('active');
@@ -26,7 +29,10 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         } else {
             sidebar.classList.add('show');
-            sidebarOverlay.classList.add('show');
+            // Only show overlay on mobile/tablet
+            if (window.innerWidth <= 1024) {
+                sidebarOverlay.classList.add('show');
+            }
             // Update both toggle buttons
             document.querySelectorAll('.sidebar-toggle').forEach(btn => {
                 btn.classList.add('active');
@@ -41,7 +47,10 @@ document.addEventListener('DOMContentLoaded', function() {
     // Close sidebar
     function closeSidebar() {
         sidebar.classList.remove('show');
-        sidebarOverlay.classList.remove('show');
+        // Only hide overlay on mobile/tablet
+        if (window.innerWidth <= 1024) {
+            sidebarOverlay.classList.remove('show');
+        }
         // Update both toggle buttons
         document.querySelectorAll('.sidebar-toggle').forEach(btn => {
             btn.classList.remove('active');
@@ -122,12 +131,16 @@ document.addEventListener('DOMContentLoaded', function() {
 document.querySelectorAll('a[href^="#"]').forEach(anchor => {
     anchor.addEventListener('click', function (e) {
         e.preventDefault();
-        const target = document.querySelector(this.getAttribute('href'));
-        if (target) {
-            target.scrollIntoView({
-                behavior: 'smooth',
-                block: 'start'
-            });
+        const href = this.getAttribute('href');
+        // Only proceed if href has more than just '#'
+        if (href && href.length > 1) {
+            const target = document.querySelector(href);
+            if (target) {
+                target.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start'
+                });
+            }
         }
     });
 });
