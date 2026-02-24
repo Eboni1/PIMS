@@ -2,7 +2,7 @@
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Sidebar script loaded');
     
-    const sidebarToggle = document.getElementById('sidebarToggle');
+    const sidebarToggle = document.getElementById('sidebarToggleBtn');
     const sidebar = document.getElementById('sidebar');
     const mainWrapper = document.getElementById('mainWrapper');
     

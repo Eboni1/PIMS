@@ -723,6 +723,6 @@ if ($office_id && $conn) {
     </script>
     
     <!-- Sidebar Scripts -->
-    <script src="../assets/js/sidebar.js"></script>
+    <script src="includes/sidebar-scripts.php"></script>
 </body>
 </html>
